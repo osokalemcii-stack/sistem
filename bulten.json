@@ -1,0 +1,62 @@
+[
+    {
+        "lig": "Türkiye Süper Lig",
+        "maclar": [
+            {
+                "ev_sahibi": "Takim A",
+                "deplasman": "Takim B",
+                "oran_ev": 2.1,
+                "oran_beraberlik": 3.2,
+                "oran_deplasman": 3.0
+            }
+        ]
+    },
+    {
+        "lig": "Türkiye 1. Lig",
+        "maclar": [
+            {
+                "ev_sahibi": "Takim A",
+                "deplasman": "Takim B",
+                "oran_ev": 2.1,
+                "oran_beraberlik": 3.2,
+                "oran_deplasman": 3.0
+            }
+        ]
+    },
+    {
+        "lig": "İngiltere Premier Lig",
+        "maclar": [
+            {
+                "ev_sahibi": "Takim A",
+                "deplasman": "Takim B",
+                "oran_ev": 2.1,
+                "oran_beraberlik": 3.2,
+                "oran_deplasman": 3.0
+            }
+        ]
+    },
+    {
+        "lig": "İtalya Serie A",
+        "maclar": [
+            {
+                "ev_sahibi": "Takim A",
+                "deplasman": "Takim B",
+                "oran_ev": 2.1,
+                "oran_beraberlik": 3.2,
+                "oran_deplasman": 3.0
+            }
+        ]
+    },
+    {
+        "lig": "İtalya Serie B",
+        "maclar": [
+            {
+                "ev_sahibi": "Takim A",
+                "deplasman": "Takim B",
+                "oran_ev": 2.1,
+                "oran_beraberlik": 3.2,
+                "oran_deplasman": 3.0
+            }
+        ]
+    }
+]
