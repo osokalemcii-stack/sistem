@@ -4,11 +4,12 @@ import re
 import json
 import time
 import requests
+
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # =====================================================
-# SPORTSTATS API
+# AYARLAR
 # =====================================================
 
 BASE_URL = "https://api.sportstatsapi.com/api/v1"
@@ -24,102 +25,82 @@ SESSION.headers.update({
 })
 
 OUTPUT_FILE = Path("bulten.json")
+ARCHIVE_FILE = Path("bulten_history.json")
 
-# Son 90 gün + gelecek 14 gün
 TODAY = datetime.now(timezone.utc).date()
-DATE_FROM = (TODAY - timedelta(days=90)).isoformat()
-DATE_TO = (TODAY + timedelta(days=14)).isoformat()
 
-# Ücretsiz plan: dakikada 5 istek
-REQUEST_DELAY = 12.5
+BOOTSTRAP_DAYS = 90
+INCREMENTAL_DAYS = 7
+FUTURE_DAYS = 14
+
 HISTORY_LIMIT = 12
+PAGE_LIMIT = 100
+
+# 5 istek/dakika sınırına uygun.
+REQUEST_DELAY = 12.5
+
+# Günlük kotayı tek çalışmada tüketmemek için güvenlik sınırı.
+MAX_API_CALLS = 45
+
 last_request_time = 0
+api_call_count = 0
 
 
 # =====================================================
-# 25 LİG
+# LİGLER
 # =====================================================
 
 LEAGUES = [
-    {"code": "l7c", "country": "Türkiye", "league": "Süper Lig", "api_name": "Turkey: Super Lig"},
-    {"code": "l79", "country": "Türkiye", "league": "1. Lig", "api_name": "Turkey: 1. Lig"},
-    {"code": "l30", "country": "İngiltere", "league": "Premier League", "api_name": "England: Premier League"},
-    {"code": "l31", "country": "İngiltere", "league": "Championship", "api_name": "England: Championship"},
-    {"code": "l4b", "country": "İtalya", "league": "Serie A", "api_name": "Italy: Serie A"},
-    {"code": "l4a", "country": "İtalya", "league": "Serie B", "api_name": "Italy: Serie B"},
-    {"code": "l6t", "country": "İspanya", "league": "LaLiga", "api_name": "Spain: LaLiga"},
-    {"code": "l6s", "country": "İspanya", "league": "LaLiga 2", "api_name": "Spain: LaLiga2"},
-    {"code": "l19", "country": "Belçika", "league": "Jupiler Pro League", "api_name": "Belgium: Jupiler Pro League"},
-    {"code": "l5u", "country": "Portekiz", "league": "Liga Portugal", "api_name": "Portugal: Liga Portugal"},
-    {"code": "l58", "country": "Hollanda", "league": "Eredivisie", "api_name": "Netherlands: Eredivisie"},
-    {"code": "l3d", "country": "Fransa", "league": "Ligue 1", "api_name": "France: Ligue 1"},
-    {"code": "l3a", "country": "Fransa", "league": "Ligue 2", "api_name": "France: Ligue 2"},
-    {"code": "l3k", "country": "Almanya", "league": "Bundesliga", "api_name": "Germany: Bundesliga"},
-    {"code": "l3g", "country": "Almanya", "league": "2. Bundesliga", "api_name": "Germany: 2. Bundesliga"},
-    {"code": "l3n", "country": "Yunanistan", "league": "Super League", "api_name": "Greece: Super League"},
-    {"code": "l7x", "country": "Rusya", "league": "Premier League", "api_name": "Russia: Premier League"},
-    {"code": "l66", "country": "Suudi Arabistan", "league": "Saudi Professional League", "api_name": "Saudi Arabia: Saudi Professional League"},
-    {"code": "l67", "country": "İskoçya", "league": "Premiership", "api_name": "Scotland: Premiership"},
-    {"code": "l12", "country": "Avusturya", "league": "Bundesliga", "api_name": "Austria: Bundesliga"},
-    {"code": "l13", "country": "Azerbaycan", "league": "Premier League", "api_name": "Azerbaijan: Premier League"},
-    {"code": "l7k", "country": "ABD", "league": "MLS", "api_name": "USA: Mls"},
-    {"code": "l3", "country": "Avrupa", "league": "Şampiyonlar Ligi", "api_name": "Europe: Champions League - League Phase"},
-    {"code": "l4", "country": "Avrupa", "league": "Avrupa Ligi", "api_name": "Europe: Europa League - League Phase"},
-    {"code": "laz", "country": "Avrupa", "league": "Konferans Ligi", "api_name": "Europe: Conference League - League Phase"},
+    {"code":"l7c","country":"Türkiye","league":"Süper Lig","api_name":"Turkey: Super Lig"},
+    {"code":"l79","country":"Türkiye","league":"1. Lig","api_name":"Turkey: 1. Lig"},
+    {"code":"l30","country":"İngiltere","league":"Premier League","api_name":"England: Premier League"},
+    {"code":"l31","country":"İngiltere","league":"Championship","api_name":"England: Championship"},
+    {"code":"l4b","country":"İtalya","league":"Serie A","api_name":"Italy: Serie A"},
+    {"code":"l4a","country":"İtalya","league":"Serie B","api_name":"Italy: Serie B"},
+    {"code":"l6t","country":"İspanya","league":"LaLiga","api_name":"Spain: LaLiga"},
+    {"code":"l6s","country":"İspanya","league":"LaLiga 2","api_name":"Spain: LaLiga2"},
+    {"code":"l19","country":"Belçika","league":"Jupiler Pro League","api_name":"Belgium: Jupiler Pro League"},
+    {"code":"l5u","country":"Portekiz","league":"Liga Portugal","api_name":"Portugal: Liga Portugal"},
+    {"code":"l58","country":"Hollanda","league":"Eredivisie","api_name":"Netherlands: Eredivisie"},
+    {"code":"l3d","country":"Fransa","league":"Ligue 1","api_name":"France: Ligue 1"},
+    {"code":"l3a","country":"Fransa","league":"Ligue 2","api_name":"France: Ligue 2"},
+    {"code":"l3k","country":"Almanya","league":"Bundesliga","api_name":"Germany: Bundesliga"},
+    {"code":"l3g","country":"Almanya","league":"2. Bundesliga","api_name":"Germany: 2. Bundesliga"},
+    {"code":"l3n","country":"Yunanistan","league":"Super League","api_name":"Greece: Super League"},
+    {"code":"l7x","country":"Rusya","league":"Premier League","api_name":"Russia: Premier League"},
+    {"code":"l66","country":"Suudi Arabistan","league":"Saudi Professional League","api_name":"Saudi Arabia: Saudi Professional League"},
+    {"code":"l67","country":"İskoçya","league":"Premiership","api_name":"Scotland: Premiership"},
+    {"code":"l12","country":"Avusturya","league":"Bundesliga","api_name":"Austria: Bundesliga"},
+    {"code":"l13","country":"Azerbaycan","league":"Premier League","api_name":"Azerbaijan: Premier League"},
+    {"code":"l7k","country":"ABD","league":"MLS","api_name":"USA: Mls"},
+    {"code":"l3","country":"Avrupa","league":"Şampiyonlar Ligi","api_name":"Europe: Champions League - League Phase"},
+    {"code":"l4","country":"Avrupa","league":"Avrupa Ligi","api_name":"Europe: Europa League - League Phase"},
+    {"code":"laz","country":"Avrupa","league":"Konferans Ligi","api_name":"Europe: Conference League - League Phase"}
 ]
 
 
 # =====================================================
-# API İSTEKLERİ
+# YARDIMCI FONKSİYONLAR
 # =====================================================
 
-def api_get(path, params):
-    global last_request_time
+def log(message):
+    print(message, flush=True)
 
-    elapsed = time.time() - last_request_time
-    if last_request_time and elapsed < REQUEST_DELAY:
-        time.sleep(REQUEST_DELAY - elapsed)
-
-    for attempt in range(4):
-        response = SESSION.get(
-            BASE_URL + path,
-            params=params,
-            timeout=50
-        )
-        last_request_time = time.time()
-
-        if response.status_code == 429:
-            wait = int(response.headers.get("Retry-After", 60))
-            print(f"API limitine ulaşıldı. {wait} saniye bekleniyor...")
-            time.sleep(wait)
-            continue
-
-        response.raise_for_status()
-        payload = response.json()
-
-        if not payload.get("success"):
-            raise RuntimeError(f"API başarısız yanıt verdi: {payload}")
-
-        return payload
-
-    raise RuntimeError("API isteği dört denemede tamamlanamadı.")
-
-
-# =====================================================
-# VERİ YARDIMCILARI
-# =====================================================
 
 def normalize_name(value):
-    return re.sub(r"\s+", " ", str(value or "").strip().casefold())
+    return re.sub(
+        r"\s+", " ",
+        str(value or "").strip().casefold()
+    )
 
 
-def get_team_name(team):
+def team_name(team):
     if not isinstance(team, dict):
         return ""
     return team.get("display_name") or team.get("name") or ""
 
 
-def get_referee(match):
+def referee_name(match):
     value = match.get("referee") or ""
 
     if isinstance(value, dict):
@@ -132,7 +113,11 @@ def parse_score(value):
     if not value:
         return None
 
-    found = re.search(r"(\d+)\s*[-:]\s*(\d+)", str(value))
+    found = re.search(
+        r"(\d+)\s*[-:]\s*(\d+)",
+        str(value)
+    )
+
     if not found:
         return None
 
@@ -143,10 +128,10 @@ def parse_score(value):
 
 
 def get_full_score(match):
-    score = parse_score(match.get("full_time_score"))
+    result = parse_score(match.get("full_time_score"))
 
-    if score:
-        return score
+    if result:
+        return result
 
     home = match.get("home_team") or {}
     away = match.get("away_team") or {}
@@ -155,7 +140,10 @@ def get_full_score(match):
     a = away.get("score")
 
     if h is not None and a is not None:
-        return {"home": int(h), "away": int(a)}
+        return {
+            "home": int(h),
+            "away": int(a)
+        }
 
     return None
 
@@ -175,21 +163,25 @@ def is_finished(match):
     return (
         code in {
             "final", "finished",
-            "after_extra_time", "after_penalties"
+            "after_extra_time", "after_penalties",
+            "ft", "aet", "pen", "completed"
         }
-        or status in {"FT", "AET", "PEN", "FINISHED"}
+        or status in {
+            "FT", "AET", "PEN", "FINISHED", "FINAL"
+        }
     )
 
 
-def get_match_date(match):
+def match_date(match):
     return (
         match.get("start_at")
         or match.get("start_date")
+        or match.get("date")
         or ""
     )
 
 
-def get_match_id(match, league, home, away):
+def match_id(match, league, home, away, date):
     value = (
         match.get("match_id")
         or match.get("id")
@@ -199,148 +191,249 @@ def get_match_id(match, league, home, away):
     if value:
         return str(value)
 
-    return f"{league['code']}-{get_match_date(match)}-{home}-{away}"
+    return (
+        f"{league['code']}-"
+        f"{date}-{normalize_name(home)}-{normalize_name(away)}"
+    )
+
+
+def safe_json_load(path, default):
+    if not path.exists():
+        return default
+
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            return json.load(file)
+    except Exception as error:
+        log(f"UYARI: {path} okunamadi: {error}")
+        return default
+
+
+def save_json(path, data):
+    temp = path.with_suffix(".tmp")
+
+    with temp.open("w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
+
+    temp.replace(path)
 
 
 # =====================================================
-# MAÇ GEÇMİŞİ KAYDI
+# API İSTEĞİ
 # =====================================================
 
-def make_history_item(match, team_key=None):
-    ht = match.get("_half_score")
-    ft = match.get("_full_score")
+class DailyQuotaReached(Exception):
+    pass
 
-    if not ht or not ft:
-        return None
 
-    home_key = match["_home_key"]
-    away_key = match["_away_key"]
+def api_get(path, params):
+    global last_request_time
+    global api_call_count
 
-    # Takımın kendi açısından attığı ve yediği goller
-    if team_key == home_key:
-        goals_for_ht = ht["home"]
-        goals_against_ht = ht["away"]
-        goals_for_ft = ft["home"]
-        goals_against_ft = ft["away"]
+    if api_call_count >= MAX_API_CALLS:
+        raise DailyQuotaReached(
+            f"Guvenlik siniri: {MAX_API_CALLS} API istegi."
+        )
 
-    elif team_key == away_key:
-        goals_for_ht = ht["away"]
-        goals_against_ht = ht["home"]
-        goals_for_ft = ft["away"]
-        goals_against_ft = ft["home"]
+    elapsed = time.time() - last_request_time
 
-    else:
-        goals_for_ht = None
-        goals_against_ht = None
-        goals_for_ft = None
-        goals_against_ft = None
+    if last_request_time and elapsed < REQUEST_DELAY:
+        wait = REQUEST_DELAY - elapsed
+        log(f"API hiz siniri: {wait:.1f} saniye bekleniyor.")
+        time.sleep(wait)
 
-    return {
-        "date": match["date"],
-        "home": match["home"],
-        "away": match["away"],
-        "halfTimeScore": f"{ht['home']}-{ht['away']}",
-        "finalScore": f"{ft['home']}-{ft['away']}",
-        "teamGoalsHT": goals_for_ht,
-        "opponentGoalsHT": goals_against_ht,
-        "teamGoalsFT": goals_for_ft,
-        "opponentGoalsFT": goals_against_ft,
-        "league": match["league"],
-        "referee": match["referee"]
-    }
+    response = SESSION.get(
+        BASE_URL + path,
+        params=params,
+        timeout=(10, 35)
+    )
+
+    last_request_time = time.time()
+    api_call_count += 1
+
+    if response.status_code == 429:
+        retry_after = response.headers.get("Retry-After", "")
+
+        try:
+            wait = int(retry_after)
+        except (ValueError, TypeError):
+            wait = 0
+
+        if wait > 120:
+            raise DailyQuotaReached(
+                f"API kota siniri. Retry-After: {wait} saniye. "
+                "Uzun bekleme yapilmadi."
+            )
+
+        raise DailyQuotaReached(
+            "API 429 yaniti verdi. Kota veya hiz siniri."
+        )
+
+    response.raise_for_status()
+
+    payload = response.json()
+
+    if not payload.get("success"):
+        raise RuntimeError(
+            f"API basarisiz yanit verdi: {payload}"
+        )
+
+    return payload
 
 
 # =====================================================
-# MAÇLARI TOPLA
+# ARŞİVİ YÜKLE
 # =====================================================
 
-print("=" * 60)
-print("GERÇEK FUTBOL VERİSİ TOPLANIYOR")
-print(f"Tarih aralığı: {DATE_FROM} - {DATE_TO}")
-print(f"Geçmiş kayıt hedefi: Son {HISTORY_LIMIT} tamamlanmış maç")
-print("=" * 60)
+archive_data = safe_json_load(ARCHIVE_FILE, {})
 
-all_matches = []
-seen_ids = set()
+if isinstance(archive_data, dict):
+    archived_matches = archive_data.get("matches", [])
+else:
+    archived_matches = []
+
+# Eski bulten.json dosyasından da kayıt kurtarmayı dene.
+old_bulletin = safe_json_load(OUTPUT_FILE, [])
+
+if not archived_matches and isinstance(old_bulletin, list):
+    archived_matches = old_bulletin
+
+archive = {}
+
+for item in archived_matches:
+    if not isinstance(item, dict):
+        continue
+
+    item_id = item.get("id")
+
+    if item_id:
+        archive[str(item_id)] = item
+
+
+# =====================================================
+# İLK YÜKLEME / GÜNLÜK GÜNCELLEME
+# =====================================================
+
+bootstrap = len(archive) == 0
+
+if bootstrap:
+    date_from = (
+        TODAY - timedelta(days=BOOTSTRAP_DAYS)
+    ).isoformat()
+
+    mode = "ILK VERI YUKLEMESI"
+
+else:
+    date_from = (
+        TODAY - timedelta(days=INCREMENTAL_DAYS)
+    ).isoformat()
+
+    mode = "ARTIMSAL GUNCELLEME"
+
+
+date_to = (
+    TODAY + timedelta(days=FUTURE_DAYS)
+).isoformat()
+
+log("=" * 60)
+log("GERCEK FUTBOL VERISI TOPLANIYOR")
+log(f"Mod: {mode}")
+log(f"Tarih araligi: {date_from} - {date_to}")
+log(f"Arsivdeki mevcut mac: {len(archive)}")
+log("=" * 60)
+
+
+# =====================================================
+# LİGLERDEN VERİ AL
+# =====================================================
+
 league_errors = []
+successful_leagues = 0
+new_count = 0
+quota_error = None
 
 for index, league in enumerate(LEAGUES, start=1):
-    print(f"\n[{index}/{len(LEAGUES)}] {league['country']} - {league['league']}")
+
+    log(
+        f"\n[{index}/{len(LEAGUES)}] "
+        f"{league['country']} - {league['league']}"
+    )
 
     offset = 0
-    limit = 100
     league_added = 0
 
     try:
         while True:
+
             params = {
                 "league_name": league["api_name"],
-                "date_from": DATE_FROM,
-                "date_to": DATE_TO,
-                "limit": limit,
+                "date_from": date_from,
+                "date_to": date_to,
+                "limit": PAGE_LIMIT,
                 "offset": offset,
                 "order": "asc"
             }
 
-            payload = api_get("/soccer/matches", params)
+            payload = api_get(
+                "/soccer/matches",
+                params
+            )
+
             page = payload.get("data") or []
 
             for raw in page:
+
                 api_code = str(raw.get("league_code") or "")
 
                 if api_code and api_code != league["code"]:
                     continue
 
-                home = get_team_name(raw.get("home_team"))
-                away = get_team_name(raw.get("away_team"))
+                home = team_name(raw.get("home_team"))
+                away = team_name(raw.get("away_team"))
 
                 if not home or not away:
                     continue
 
-                match_id = get_match_id(raw, league, home, away)
+                date = match_date(raw)
 
-                if match_id in seen_ids:
-                    continue
+                item_id = match_id(
+                    raw, league, home, away, date
+                )
 
-                seen_ids.add(match_id)
-
-                full_score = get_full_score(raw)
-                half_score = get_half_score(raw)
-                referee = get_referee(raw)
+                full = get_full_score(raw)
+                half = get_half_score(raw)
 
                 item = {
-                    "id": match_id,
+                    "id": item_id,
                     "country": league["country"],
                     "league": league["league"],
-                    "date": get_match_date(raw),
+                    "leagueCode": league["code"],
+                    "date": date,
                     "home": home,
                     "away": away,
-                    "referee": referee,
+                    "referee": referee_name(raw),
                     "status": raw.get("status") or "",
                     "statusCode": get_status_code(raw),
                     "finalScore": (
-                        f"{full_score['home']}-{full_score['away']}"
-                        if full_score else ""
+                        f"{full['home']}-{full['away']}"
+                        if full else ""
                     ),
                     "halfTimeScore": (
-                        f"{half_score['home']}-{half_score['away']}"
-                        if half_score else ""
-                    ),
-                    "homeMatches": [],
-                    "awayMatches": [],
-                    "refMatches": [],
-                    "_home_key": normalize_name(home),
-                    "_away_key": normalize_name(away),
-                    "_ref_key": normalize_name(referee),
-                    "_finished": is_finished(raw),
-                    "_full_score": full_score,
-                    "_half_score": half_score
+                        f"{half['home']}-{half['away']}"
+                        if half else ""
+                    )
                 }
 
-                all_matches.append(item)
+                if item_id not in archive:
+                    new_count += 1
+
+                archive[item_id] = item
                 league_added += 1
 
-            print(f"  Sayfa {offset // limit + 1}: {len(page)} maç")
+            log(
+                f"  Sayfa {offset // PAGE_LIMIT + 1}: "
+                f"{len(page)} mac"
+            )
 
             meta = payload.get("meta") or {}
             total = meta.get("total")
@@ -348,61 +441,167 @@ for index, league in enumerate(LEAGUES, start=1):
             if not page:
                 break
 
-            if total is not None and offset + len(page) >= int(total):
+            if total is not None:
+                if offset + len(page) >= int(total):
+                    break
+            elif len(page) < PAGE_LIMIT:
                 break
 
-            if total is None and len(page) < limit:
+            offset += PAGE_LIMIT
+
+            # Her lig için en fazla 3 sayfa.
+            if offset >= PAGE_LIMIT * 3:
+                log("  Sayfa guvenlik sinirina ulasildi.")
                 break
 
-            offset += limit
+    except DailyQuotaReached as error:
+        quota_error = str(error)
+        log(f"API KOTA DURDURMASI: {quota_error}")
+        break
 
     except Exception as error:
-        league_errors.append(f"{league['league']}: {error}")
-        print(f"  LİG HATASI: {error}")
+        league_errors.append(
+            f"{league['league']}: {error}"
+        )
+        log(f"  LIG HATASI: {error}")
+        continue
 
-    print(f"  Eklenen maç: {league_added}")
+    successful_leagues += 1
+
+    log(f"  Bu ligden eklenen/guncellenen: {league_added}")
+
+
+# =====================================================
+# KOTA VE HATA KONTROLÜ
+# =====================================================
+
+if quota_error:
+    raise SystemExit(
+        "\nVERI TOPLAMA DURDURULDU.\n"
+        f"Neden: {quota_error}\n"
+        "Mevcut arsiv ve bulten dosyalari korunuyor."
+    )
+
+if successful_leagues == 0:
+    raise SystemExit(
+        "HATA: Hicbir ligden veri alinamadi. "
+        "Mevcut dosyalar korunuyor."
+    )
+
+
+# =====================================================
+# ARŞİVİ TEMİZLE
+# =====================================================
+
+# 180 günden eski kayıtları arşivden çıkar.
+archive_cutoff = TODAY - timedelta(days=180)
+
+clean_archive = {}
+
+for item_id, item in archive.items():
+
+    raw_date = item.get("date") or ""
+
+    try:
+        parsed = datetime.fromisoformat(
+            raw_date.replace("Z", "+00:00")
+        ).date()
+    except Exception:
+        continue
+
+    if parsed >= archive_cutoff:
+        clean_archive[item_id] = item
+
+archive = clean_archive
 
 
 # =====================================================
 # TARİHE GÖRE SIRALA
 # =====================================================
 
-all_matches.sort(key=lambda x: x["date"])
+all_matches = list(archive.values())
+
+all_matches.sort(
+    key=lambda x: x.get("date") or ""
+)
 
 
 # =====================================================
-# TAKIM VE HAKEM GEÇMİŞLERİNİ OLUŞTUR
+# TAKIM VE HAKEM GEÇMİŞLERİ
 # =====================================================
-
-print("\nTakım ve hakem geçmişleri hesaplanıyor...")
 
 team_history = {}
 referee_history = {}
 
+def history_item(match, team_key=None):
+
+    ht = parse_score(match.get("halfTimeScore"))
+    ft = parse_score(match.get("finalScore"))
+
+    if not ht or not ft:
+        return None
+
+    home_key = normalize_name(match.get("home"))
+    away_key = normalize_name(match.get("away"))
+
+    if team_key == home_key:
+        for_ht, against_ht = ht["home"], ht["away"]
+        for_ft, against_ft = ft["home"], ft["away"]
+
+    elif team_key == away_key:
+        for_ht, against_ht = ht["away"], ht["home"]
+        for_ft, against_ft = ft["away"], ft["home"]
+
+    else:
+        for_ht = against_ht = None
+        for_ft = against_ft = None
+
+    return {
+        "date": match.get("date"),
+        "home": match.get("home"),
+        "away": match.get("away"),
+        "halfTimeScore": (
+            f"{ht['home']}-{ht['away']}"
+        ),
+        "finalScore": (
+            f"{ft['home']}-{ft['away']}"
+        ),
+        "teamGoalsHT": for_ht,
+        "opponentGoalsHT": against_ht,
+        "teamGoalsFT": for_ft,
+        "opponentGoalsFT": against_ft,
+        "league": match.get("league"),
+        "referee": match.get("referee")
+    }
+
+
 for match in all_matches:
-    home_key = match["_home_key"]
-    away_key = match["_away_key"]
-    referee_key = match["_ref_key"]
 
-    # Maçtan önceki geçmiş kayıtları
-    home_previous = team_history.get(home_key, [])
-    away_previous = team_history.get(away_key, [])
-    referee_previous = referee_history.get(referee_key, [])
+    home_key = normalize_name(match.get("home"))
+    away_key = normalize_name(match.get("away"))
+    ref_key = normalize_name(match.get("referee"))
 
-    match["homeMatches"] = home_previous[-HISTORY_LIMIT:][::-1]
-    match["awayMatches"] = away_previous[-HISTORY_LIMIT:][::-1]
-    match["refMatches"] = referee_previous[-HISTORY_LIMIT:][::-1]
+    match["homeMatches"] = (
+        team_history.get(home_key, [])[-HISTORY_LIMIT:][::-1]
+    )
 
-    # Sadece tamamlanmış ve iki skor bilgisi de bulunan maçlar geçmişe girer.
-    if not match["_finished"]:
+    match["awayMatches"] = (
+        team_history.get(away_key, [])[-HISTORY_LIMIT:][::-1]
+    )
+
+    match["refMatches"] = (
+        referee_history.get(ref_key, [])[-HISTORY_LIMIT:][::-1]
+    )
+
+    if not is_finished(match):
         continue
 
-    if not match["_full_score"] or not match["_half_score"]:
+    if not match.get("finalScore") or not match.get("halfTimeScore"):
         continue
 
-    home_item = make_history_item(match, home_key)
-    away_item = make_history_item(match, away_key)
-    referee_item = make_history_item(match)
+    home_item = history_item(match, home_key)
+    away_item = history_item(match, away_key)
+    ref_item = history_item(match)
 
     if home_item:
         team_history.setdefault(home_key, []).append(home_item)
@@ -410,85 +609,107 @@ for match in all_matches:
     if away_item:
         team_history.setdefault(away_key, []).append(away_item)
 
-    if referee_key and referee_item:
-        referee_history.setdefault(referee_key, []).append(referee_item)
+    if ref_key and ref_item:
+        referee_history.setdefault(ref_key, []).append(ref_item)
 
 
 # =====================================================
-# JSON ÇIKTISI
+# BÜLTEN VE ARŞİV DOSYALARI
 # =====================================================
 
+# Geçmiş maçlar ve gelecek fikstürler birlikte tutulur.
 output = []
 
 for match in all_matches:
+
     output.append({
-        "id": match["id"],
-        "country": match["country"],
-        "league": match["league"],
-        "date": match["date"],
-        "home": match["home"],
-        "away": match["away"],
-        "referee": match["referee"],
-        "status": match["status"],
-        "statusCode": match["statusCode"],
-        "finalScore": match["finalScore"],
-        "halfTimeScore": match["halfTimeScore"],
-        "homeMatches": match["homeMatches"],
-        "awayMatches": match["awayMatches"],
-        "refMatches": match["refMatches"]
+        "id": match.get("id"),
+        "country": match.get("country"),
+        "league": match.get("league"),
+        "date": match.get("date"),
+        "home": match.get("home"),
+        "away": match.get("away"),
+        "referee": match.get("referee"),
+        "status": match.get("status"),
+        "statusCode": match.get("statusCode"),
+        "finalScore": match.get("finalScore"),
+        "halfTimeScore": match.get("halfTimeScore"),
+        "homeMatches": match.get("homeMatches", []),
+        "awayMatches": match.get("awayMatches", []),
+        "refMatches": match.get("refMatches", [])
     })
 
 
-# =====================================================
-# GÜVENLİ KAYIT
-# =====================================================
-
 if not output:
     raise SystemExit(
-        "HATA: Hiç maç alınamadı. Eski bulten.json korunuyor."
+        "HATA: Bulten bos. Onceki dosyalar korunuyor."
     )
 
-temp_file = OUTPUT_FILE.with_suffix(".tmp")
 
-with temp_file.open("w", encoding="utf-8") as file:
-    json.dump(output, file, ensure_ascii=False, indent=2)
+# Önce geçici dosyalara yaz, sonra güvenli değiştir.
+save_json(
+    ARCHIVE_FILE,
+    {
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "matches": all_matches
+    }
+)
 
-temp_file.replace(OUTPUT_FILE)
+save_json(OUTPUT_FILE, output)
 
 
 # =====================================================
 # RAPOR
 # =====================================================
 
-finished_count = sum(1 for m in all_matches if m["_finished"])
-with_half_time = sum(1 for m in all_matches if m["_half_score"])
-with_full_time = sum(1 for m in all_matches if m["_full_score"])
-with_referee = sum(1 for m in all_matches if m["referee"])
+finished_count = sum(
+    1 for m in all_matches if is_finished(m)
+)
+
+ht_count = sum(
+    1 for m in all_matches if m.get("halfTimeScore")
+)
+
+ft_count = sum(
+    1 for m in all_matches if m.get("finalScore")
+)
+
+ref_count = sum(
+    1 for m in all_matches if m.get("referee")
+)
 
 team_history_count = sum(
-    1 for m in output if m["homeMatches"] or m["awayMatches"]
+    1 for m in output
+    if m["homeMatches"] or m["awayMatches"]
 )
+
 ref_history_count = sum(
     1 for m in output if m["refMatches"]
 )
 
-league_count = len(set(m["league"] for m in output))
+league_count = len(
+    set(m.get("league") for m in all_matches)
+)
 
-print("\n" + "=" * 60)
-print("BÜLTEN TOPLAMA TAMAMLANDI")
-print(f"Toplam maç: {len(output)}")
-print(f"Eslesen lig: {league_count}/25")
-print(f"Tamamlanan maç: {finished_count}")
-print(f"İY skoru bulunan maç: {with_half_time}")
-print(f"MS skoru bulunan maç: {with_full_time}")
-print(f"Hakem bilgisi bulunan maç: {with_referee}")
-print(f"Takım geçmişi bulunan maç: {team_history_count}")
-print(f"Hakem geçmişi bulunan maç: {ref_history_count}")
+log("\n" + "=" * 60)
+log("BULTEN TOPLAMA TAMAMLANDI")
+log(f"Mod: {mode}")
+log(f"API istegi: {api_call_count}")
+log(f"Basarili lig: {successful_leagues}/25")
+log(f"Toplam arsiv maci: {len(all_matches)}")
+log(f"Yeni mac kaydi: {new_count}")
+log(f"Eslesen lig: {league_count}/25")
+log(f"Tamamlanan mac: {finished_count}")
+log(f"IY skoru bulunan: {ht_count}")
+log(f"MS skoru bulunan: {ft_count}")
+log(f"Hakem bilgisi bulunan: {ref_count}")
+log(f"Takim gecmisi bulunan: {team_history_count}")
+log(f"Hakem gecmisi bulunan: {ref_history_count}")
 
 if league_errors:
-    print("\nHATA ALINAN LİGLER:")
+    log("\nHATA ALINAN LIGLER:")
     for error in league_errors:
-        print(" - " + error)
+        log(" - " + error)
 
-print("\nbulten.json kaydedildi.")
-print("=" * 60)
+log("\nbulten.json ve bulten_history.json kaydedildi.")
+log("=" * 60)
