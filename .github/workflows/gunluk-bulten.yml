@@ -31,3 +31,5 @@ jobs:
           git add bulten.json
           git diff --staged --quiet || git commit -m "chore: gunluk 25 lig bulteni guncellendi"
           git push
+      - name: Onbellek yenile
+        run: echo "refresh"
