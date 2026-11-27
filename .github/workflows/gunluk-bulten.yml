@@ -4,11 +4,14 @@ name: Gunluk 25 Lig Bulten Guncelleme
 on:
   schedule:
     - cron: "0 4 * * *"
-    - cron: "30 9 * * *"
   workflow_dispatch: {}
 
 permissions:
   contents: write
+
+concurrency:
+  group: futbol-bulten
+  cancel-in-progress: false
 
 jobs:
   bulten-cek:
