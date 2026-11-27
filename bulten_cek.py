@@ -1,3 +1,4 @@
+
 import json
 import os
 import time
@@ -8,13 +9,13 @@ import requests
 
 API_URL = "https://v3.football.api-sports.io"
 API_KEY = os.getenv("API_FOOTBALL_KEY")
+
 if not API_KEY:
     raise SystemExit("API_FOOTBALL_KEY Actions secret bulunamadi.")
 
 HEADERS = {"x-apisports-key": API_KEY}
 TZ = ZoneInfo("Europe/Istanbul")
 
-# API-Football league IDs; labels match the React app.
 LEAGUES = {
     203: ("Türkiye", "Türkiye: Süper Lig"),
     204: ("Türkiye", "Türkiye: 1.Lig"),
@@ -47,91 +48,199 @@ session = requests.Session()
 session.headers.update(HEADERS)
 history_cache = {}
 
+
 def api_get(path, params):
-    response = session.get(f"{API_URL}/{path}", params=params, timeout=30)
+    response = session.get(
+        f"{API_URL}/{path}",
+        params=params,
+        timeout=30
+    )
     response.raise_for_status()
+
     payload = response.json()
+
     if payload.get("errors"):
-        raise RuntimeError(f"API-Football hata: {payload['errors']}")
+        raise RuntimeError(
+            f"API-Football hata: {payload['errors']}"
+        )
+
     return payload.get("response", [])
+
 
 def score_token(item):
     score = item.get("score", {})
     ht = score.get("halftime") or {}
     ft = score.get("fulltime") or {}
-    values = (ht.get("home"), ht.get("away"), ft.get("home"), ft.get("away"))
+
+    values = (
+        ht.get("home"),
+        ht.get("away"),
+        ft.get("home"),
+        ft.get("away")
+    )
+
     if any(value is None for value in values):
         return None
-    return f"{values[0]}-{values[1]} ({values[2]}-{values[3]})"
+
+    return (
+        f"{values[0]}-{values[1]} "
+        f"({values[2]}-{values[3]})"
+    )
+
 
 def last_team_matches(team_id):
     key = ("team", team_id)
+
     if key not in history_cache:
-        rows = api_get("fixtures", {"team": team_id, "last": 5})
-        rows.sort(key=lambda row: row.get("fixture", {}).get("date", ""))
-        history_cache[key] = [token for row in rows if (token := score_token(row))]
-        time.sleep(0.15)
+        rows = api_get(
+            "fixtures",
+            {"team": team_id, "last": 5}
+        )
+
+        rows.sort(
+            key=lambda row: row.get("fixture", {}).get("date", "")
+        )
+
+        history_cache[key] = [
+            token
+            for row in rows
+            if (token := score_token(row))
+        ]
+
+        time.sleep(0.35)
+
     return history_cache[key]
+
 
 def last_referee_matches(referee):
     if not referee or referee == "Bilinmiyor":
         return []
+
     key = ("referee", referee)
+
     if key not in history_cache:
         try:
-            rows = api_get("fixtures", {"referee": referee, "last": 5})
-            rows.sort(key=lambda row: row.get("fixture", {}).get("date", ""))
-            history_cache[key] = [token for row in rows if (token := score_token(row))]
+            rows = api_get(
+                "fixtures",
+                {"referee": referee, "last": 5}
+            )
+
+            rows.sort(
+                key=lambda row: row.get("fixture", {}).get("date", "")
+            )
+
+            history_cache[key] = [
+                token
+                for row in rows
+                if (token := score_token(row))
+            ]
+
         except Exception as exc:
-            print(f"Hakem geçmişi alınamadı ({referee}): {exc}")
+            print(
+                f"Hakem geçmişi alınamadı ({referee}): {exc}"
+            )
             history_cache[key] = []
-        time.sleep(0.15)
+
+        time.sleep(0.35)
+
     return history_cache[key]
+
 
 def main():
     now = datetime.now(TZ)
     start = now.date()
     end = (now + timedelta(days=2)).date()
 
-    # One date-range request finds fixtures across all competitions.
-    fixtures = api_get("fixtures", {
-        "from": start.isoformat(),
-        "to": end.isoformat(),
-        "timezone": "Europe/Istanbul",
-    })
+    print("Fikstürler API-Football üzerinden çekiliyor...")
+
+    # ÖNEMLİ: from/to yerine date kullanıyoruz.
+    # Böylece API'nin ek parametre hatasını önlüyoruz.
+    fixtures = []
+
+    current_date = start
+
+    while current_date <= end:
+        print(f"Fikstür aranıyor: {current_date}")
+
+        daily_fixtures = api_get(
+            "fixtures",
+            {
+                "date": current_date.isoformat(),
+                "timezone": "Europe/Istanbul",
+            }
+        )
+
+        fixtures.extend(daily_fixtures)
+
+        current_date += timedelta(days=1)
+        time.sleep(0.35)
 
     selected = [
-        item for item in fixtures
+        item
+        for item in fixtures
         if item.get("league", {}).get("id") in LEAGUES
     ]
-    selected.sort(key=lambda item: item.get("fixture", {}).get("date", ""))
+
+    selected.sort(
+        key=lambda item: item.get("fixture", {}).get("date", "")
+    )
+
     selected = selected[:25]
 
     bulletin = []
-    for item in selected:
+
+    for index, item in enumerate(selected, 1):
+        print(
+            f"Maç işleniyor: {index}/{len(selected)}"
+        )
+
         league_id = item["league"]["id"]
         country, league_name = LEAGUES[league_id]
+
         fixture = item.get("fixture", {})
         teams = item.get("teams", {})
+
         home = teams.get("home", {})
         away = teams.get("away", {})
+
         referee = fixture.get("referee") or "Bilinmiyor"
+
         status_short = fixture.get("status", {}).get("short", "")
+
         finished = status_short in {"FT", "AET", "PEN"}
 
-        fulltime = (item.get("score", {}).get("fulltime") or {})
+        fulltime = (
+            item.get("score", {}).get("fulltime") or {}
+        )
+
         final_score = ""
-        if finished and fulltime.get("home") is not None and fulltime.get("away") is not None:
-            final_score = f'{fulltime["home"]}-{fulltime["away"]}'
+
+        if (
+            finished
+            and fulltime.get("home") is not None
+            and fulltime.get("away") is not None
+        ):
+            final_score = (
+                f'{fulltime["home"]}-{fulltime["away"]}'
+            )
 
         date_text = fixture.get("date", "")
+
         try:
-            local_date = datetime.fromisoformat(date_text.replace("Z", "+00:00")).astimezone(TZ)
-            date_text = local_date.strftime("%Y-%m-%d %H:%M")
+            local_date = datetime.fromisoformat(
+                date_text.replace("Z", "+00:00")
+            ).astimezone(TZ)
+
+            date_text = local_date.strftime(
+                "%Y-%m-%d %H:%M"
+            )
+
         except ValueError:
             pass
 
-        home_id, away_id = home.get("id"), away.get("id")
+        home_id = home.get("id")
+        away_id = away.get("id")
+
         bulletin.append({
             "id": f'api-{fixture.get("id")}',
             "country": country,
@@ -140,23 +249,53 @@ def main():
             "home": home.get("name", "Bilinmiyor"),
             "away": away.get("name", "Bilinmiyor"),
             "referee": referee,
-            "status": "finished" if finished else "upcoming",
+            "status": (
+                "finished" if finished else "upcoming"
+            ),
             "finalScore": final_score,
-            "homeMatches": last_team_matches(home_id) if home_id else [],
-            "awayMatches": last_team_matches(away_id) if away_id else [],
+
+            "homeMatches": (
+                last_team_matches(home_id)
+                if home_id else []
+            ),
+
+            "awayMatches": (
+                last_team_matches(away_id)
+                if away_id else []
+            ),
+
             "refMatches": last_referee_matches(referee),
         })
 
-    # Replace the old file only after every required request succeeds.
     temporary = "bulten.json.tmp"
-    with open(temporary, "w", encoding="utf-8") as handle:
-        json.dump(bulletin, handle, ensure_ascii=False, indent=2)
+
+    with open(
+        temporary,
+        "w",
+        encoding="utf-8"
+    ) as handle:
+        json.dump(
+            bulletin,
+            handle,
+            ensure_ascii=False,
+            indent=2
+        )
+
     os.replace(temporary, "bulten.json")
 
-    print(f"API-Football: {len(bulletin)} fikstür yazıldı.")
-    print(f"Takım/hakem geçmişi için yapılan benzersiz sorgu: {len(history_cache)}")
+    print("=" * 40)
+    print(f"BAŞARILI: {len(bulletin)} maç yazıldı.")
+    print(
+        f"Benzersiz geçmiş sorgusu: {len(history_cache)}"
+    )
+    print("bulten.json başarıyla güncellendi.")
+    print("=" * 40)
+
     if not bulletin:
-        print("Seçili 25 ligde önümüzdeki 48 saatte fikstür bulunamadı.")
+        print(
+            "Seçili 25 ligde önümüzdeki 48 saatte maç bulunamadı."
+        )
+
 
 if __name__ == "__main__":
     main()
