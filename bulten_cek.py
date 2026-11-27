@@ -1,146 +1,65 @@
 import os
 import json
 import requests
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
 
 BASE = "https://api.sportstatsapi.com/api/v1"
 KEY = os.getenv("SPORTSTATS_API_KEY")
-TZ = ZoneInfo("Europe/Istanbul")
 
 if not KEY:
-    raise SystemExit("HATA: SPORTSTATS_API_KEY bulunamadi.")
+    raise SystemExit("SPORTSTATS_API_KEY bulunamadi")
 
-session = requests.Session()
-session.headers.update({
-    "Authorization": f"Bearer {KEY}",
-    "Accept": "application/json"
-})
+s = requests.Session()
+s.headers.update({"Authorization": f"Bearer {KEY}"})
 
+countries = [
+    "turkey", "türkiye", "england", "italy", "spain",
+    "belgium", "portugal", "netherlands", "holland",
+    "france", "germany", "greece", "russia",
+    "saudi arabia", "scotland", "austria",
+    "azerbaijan", "usa", "united states", "europe"
+]
 
-def inspect_endpoint(path, params=None):
-    url = BASE + path
-    print("\n" + "=" * 55)
-    print("ISTEK:", path)
-    print("PARAMETRE:", params or {})
+targets = [
+    "super lig", "super league", "1. lig", "premier league",
+    "championship", "serie a", "serie b", "la liga",
+    "segunda division", "pro league", "first division a",
+    "primeira liga", "liga portugal", "eredivisie",
+    "ligue 1", "ligue 2", "bundesliga", "2. liga",
+    "2. bundesliga", "super league 1", "premiership",
+    "major league soccer", "mls", "champions league",
+    "europa league", "conference league"
+]
 
-    try:
-        response = session.get(url, params=params or {}, timeout=40)
-        print("HTTP DURUMU:", response.status_code)
+r = s.get(BASE + "/soccer/leagues", timeout=40)
+r.raise_for_status()
+payload = r.json()
 
-        if response.status_code != 200:
-            print("HATA CEVABI:", response.text[:1500])
-            return None
+if not payload.get("success"):
+    raise SystemExit("API lig listesi basarisiz: " + str(payload))
 
-        payload = response.json()
-        print("UST SEVIYE ALANLARI:", list(payload.keys()))
-        print("SUCCESS:", payload.get("success"))
+leagues = payload.get("data", [])
+print("TOPLAM LIG:", len(leagues))
+print("HEDEF LIG ADAYLARI")
+print("=" * 60)
 
-        data = payload.get("data")
-        print("DATA TIPI:", type(data).__name__)
+count = 0
 
-        if isinstance(data, list):
-            print("KAYIT SAYISI:", len(data))
-            print("META:", json.dumps(
-                payload.get("meta", {}),
-                ensure_ascii=False
-            ))
+for league in leagues:
+    name = str(league.get("name") or "")
+    official = str(league.get("official_name") or "")
+    combined = (name + " " + official).lower()
 
-            if data:
-                print("ILK KAYIT:")
-                print(json.dumps(
-                    data[0],
-                    ensure_ascii=False,
-                    indent=2
-                )[:3500])
-
-        elif isinstance(data, dict):
-            print("DATA ALANLARI:", list(data.keys()))
-            print(json.dumps(
-                data,
-                ensure_ascii=False,
-                indent=2
-            )[:3500])
-        else:
-            print("DATA:", str(data)[:1500])
-
-        return payload
-
-    except Exception as error:
-        print("ISTEK HATASI:", repr(error))
-        return None
-
-
-def main():
-    print("SPORTSTATSAPI TANI TESTI")
-    print("TARIH:", datetime.now(TZ).isoformat())
-
-    # 1. Gerçek lig listesini incele
-    result = inspect_endpoint("/soccer/leagues")
-
-    if result:
-        leagues = result.get("data", [])
-
-        if isinstance(leagues, list):
-            print("\nTOPLAM LIG:", len(leagues))
-            print("\nHEDEF LIGLERLE ILGILI ADAYLAR:")
-
-            keywords = [
-                "super", "premier", "championship",
-                "serie", "liga", "bundesliga",
-                "eredivisie", "ligue", "champions",
-                "europa", "conference", "mls",
-                "turkey", "türkiye", "england",
-                "germany", "spain", "italy"
-            ]
-
-            shown = 0
-
-            for league in leagues:
-                text = json.dumps(
-                    league,
-                    ensure_ascii=False
-                ).lower()
-
-                if any(word in text for word in keywords):
-                    print(json.dumps(
-                        league,
-                        ensure_ascii=False
-                    ))
-                    shown += 1
-
-                    if shown >= 100:
-                        print("Ilk 100 aday gosterildi.")
-                        break
-
-    # 2. Bugün ve sonraki iki günün maçlarını incele
-    today = datetime.now(TZ).date()
-
-    for offset in range(3):
-        day = (today + timedelta(days=offset)).isoformat()
-
-        inspect_endpoint(
-            "/soccer/matches",
-            {
-                "date": day,
-                "limit": 5,
-                "offset": 0
-            }
-        )
-
-    # 3. Tarih filtresi olmadan örnek maç sorgusu
-    inspect_endpoint(
-        "/soccer/matches",
-        {
-            "limit": 5,
-            "offset": 0
-        }
+    country_ok = any(
+        name.lower().startswith(country + ":")
+        for country in countries
     )
 
-    print("\n" + "=" * 55)
-    print("TANI TESTI TAMAMLANDI.")
-    print("Mevcut bulten.json dosyasina dokunulmadi.")
+    league_ok = any(word in combined for word in targets)
 
+    if country_ok and league_ok:
+        print(json.dumps(league, ensure_ascii=False))
+        count += 1
 
-if __name__ == "__main__":
-    main()
+print("=" * 60)
+print("BULUNAN ADAY SAYISI:", count)
+print("TEST TAMAMLANDI - BULTEN DOSYALARINA DOKUNULMADI")
