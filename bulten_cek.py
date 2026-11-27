@@ -1,5 +1,5 @@
+
 import os
-import json
 import requests
 
 BASE = "https://api.sportstatsapi.com/api/v1"
@@ -8,15 +8,21 @@ KEY = os.getenv("SPORTSTATS_API_KEY")
 if not KEY:
     raise SystemExit("SPORTSTATS_API_KEY bulunamadi")
 
-s = requests.Session()
-s.headers.update({"Authorization": f"Bearer {KEY}"})
+headers = {"Authorization": f"Bearer {KEY}"}
+
+r = requests.get(BASE + "/soccer/leagues", headers=headers, timeout=40)
+r.raise_for_status()
+payload = r.json()
+
+if not payload.get("success"):
+    raise SystemExit(str(payload))
 
 countries = [
-    "turkey", "türkiye", "england", "italy", "spain",
-    "belgium", "portugal", "netherlands", "holland",
-    "france", "germany", "greece", "russia",
-    "saudi arabia", "scotland", "austria",
-    "azerbaijan", "usa", "united states", "europe"
+    "turkey", "england", "italy", "spain", "belgium",
+    "portugal", "netherlands", "holland", "france",
+    "germany", "greece", "russia", "saudi arabia",
+    "scotland", "austria", "azerbaijan", "usa",
+    "united states", "europe"
 ]
 
 targets = [
@@ -30,24 +36,16 @@ targets = [
     "europa league", "conference league"
 ]
 
-r = s.get(BASE + "/soccer/leagues", timeout=40)
-r.raise_for_status()
-payload = r.json()
-
-if not payload.get("success"):
-    raise SystemExit("API lig listesi basarisiz: " + str(payload))
-
-leagues = payload.get("data", [])
-print("TOPLAM LIG:", len(leagues))
-print("HEDEF LIG ADAYLARI")
-print("=" * 60)
+print("=== HEDEF LIGLER VE KODLARI ===")
 
 count = 0
 
-for league in leagues:
+for league in payload.get("data", []):
     name = str(league.get("name") or "")
     official = str(league.get("official_name") or "")
-    combined = (name + " " + official).lower()
+    divisions = league.get("divisions") or []
+
+    combined = (name + " " + official + " " + " ".join(divisions)).lower()
 
     country_ok = any(
         name.lower().startswith(country + ":")
@@ -57,9 +55,13 @@ for league in leagues:
     league_ok = any(word in combined for word in targets)
 
     if country_ok and league_ok:
-        print(json.dumps(league, ensure_ascii=False))
+        print(f"KOD: {league.get('code')}")
+        print(f"AD: {name}")
+        print(f"RESMI AD: {official}")
+        if divisions:
+            print("ALT LIGLER: " + " / ".join(divisions))
+        print("---")
         count += 1
 
-print("=" * 60)
-print("BULUNAN ADAY SAYISI:", count)
+print(f"TOPLAM ADAY: {count}")
 print("TEST TAMAMLANDI - BULTEN DOSYALARINA DOKUNULMADI")
