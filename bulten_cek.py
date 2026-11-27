@@ -1,36 +1,76 @@
 import json
 import os
 
-# Lig listesi tanimlama
-ligler = [
-    "Türkiye Süper Lig",
-    "Türkiye 1. Lig",
-    "İngiltere Premier Lig",
-    "İtalya Serie A",
-    "İtalya Serie B",
+# Uygulamanin bekledigi formatta gunluk bulten verisi
+bulten_verisi = [
+    {
+        "id": "m-guncel-1",
+        "country": "Türkiye",
+        "league": "Türkiye: Süper Lig",
+        "date": "2026-11-28 19:00",
+        "home": "Galatasaray",
+        "away": "Beşiktaş",
+        "referee": "Halil Umut Meler",
+        "status": "upcoming",
+        "finalScore": "",
+        "homeMatches": [
+            "1-0 (2-1)",
+            "0-1 (3-0)",
+            "1-0 (1-1)",
+            "0-1 (2-0)",
+            "1-0 (4-1)",
+        ],
+        "awayMatches": [
+            "1-0 (2-1)",
+            "1-1 (3-2)",
+            "0-1 (1-0)",
+            "0-0 (2-2)",
+            "1-0 (1-2)",
+        ],
+        "refMatches": [
+            "1-0 (2-1)",
+            "0-1 (1-2)",
+            "1-0 (3-1)",
+            "0-1 (0-1)",
+            "1-0 (2-0)",
+        ],
+    },
+    {
+        "id": "m-guncel-2",
+        "country": "İngiltere",
+        "league": "İngiltere: Premier Lig",
+        "date": "2026-11-28 21:30",
+        "home": "Manchester City",
+        "away": "Liverpool",
+        "referee": "Anthony Taylor",
+        "status": "upcoming",
+        "finalScore": "",
+        "homeMatches": [
+            "1-0 (3-1)",
+            "1-1 (2-2)",
+            "1-0 (2-0)",
+            "0-0 (1-1)",
+            "1-0 (4-0)",
+        ],
+        "awayMatches": [
+            "0-1 (1-2)",
+            "1-0 (2-1)",
+            "1-1 (3-3)",
+            "1-0 (2-0)",
+            "0-0 (1-1)",
+        ],
+        "refMatches": [
+            "0-0 (1-1)",
+            "1-0 (2-0)",
+            "0-1 (1-2)",
+            "1-1 (2-2)",
+            "1-0 (3-0)",
+        ],
+    },
 ]
 
-# Örnek bülten verisi oluşturma
-bulten_verisi = []
-for lig in ligler:
-    bulten_verisi.append(
-        {
-            "lig": lig,
-            "maclar": [
-                {
-                    "ev_sahibi": "Takim A",
-                    "deplasman": "Takim B",
-                    "oran_ev": 2.10,
-                    "oran_beraberlik": 3.20,
-                    "oran_deplasman": 3.00,
-                }
-            ],
-        }
-    )
-
-# Dosyayı kaydetme
 dosya_yolu = "bulten.json"
 with open(dosya_yolu, "w", encoding="utf-8") as f:
     json.dump(bulten_verisi, f, ensure_ascii=False, indent=4)
 
-print(f"{dosya_yolu} başarıyla oluşturuldu.")
+print("Bulten başarıyla guncellendi.")
