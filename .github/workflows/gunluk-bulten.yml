@@ -13,6 +13,10 @@ permissions:
 jobs:
   bulten-cek:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      PYTHONUNBUFFERED: "1"
 
     steps:
       - name: Depoyu indir
@@ -27,13 +31,12 @@ jobs:
         env:
           SPORTSTATS_API_KEY: ${{ secrets.SPORTSTATS_API_KEY }}
         run: |
-          python -m pip install --upgrade pip
           pip install requests
-          python bulten_cek.py
+          python -u bulten_cek.py
 
       - name: Analiz motorunu calistir
         run: |
-          python analiz_motoru.py
+          python -u analiz_motoru.py
 
       - name: Bulten ve analiz dosyalarini kaydet
         run: |
