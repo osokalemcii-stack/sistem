@@ -7,9 +7,9 @@ import requests
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# =========================================================
-# SPORTSTATS API
-# =========================================================
+# =====================================================
+# SPORTSTATS API AYARLARI
+# =====================================================
 
 BASE_URL = "https://api.sportstatsapi.com/api/v1"
 API_KEY = os.getenv("SPORTSTATS_API_KEY")
@@ -17,20 +17,25 @@ API_KEY = os.getenv("SPORTSTATS_API_KEY")
 if not API_KEY:
     raise SystemExit("HATA: SPORTSTATS_API_KEY bulunamadi.")
 
-HEADERS = {
-    "Authorization": f"Bearer {API_KEY}"
-}
-
-OUTPUT_FILE = Path("bulten.json")
+HEADERS = {"Authorization": f"Bearer {API_KEY}"}
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
 
-# =========================================================
+OUTPUT_FILE = Path("bulten.json")
+
+# 60 gun gecmis + 14 gun gelecek
+TODAY = datetime.now(timezone.utc).date()
+DATE_FROM = (TODAY - timedelta(days=60)).isoformat()
+DATE_TO = (TODAY + timedelta(days=14)).isoformat()
+
+# Ucretsiz planin hiz sinirina uygun
+REQUEST_DELAY = 12.5
+last_request_time = 0
+
+
+# =====================================================
 # 25 HEDEF LIG
-# Kodlar, SportStatsAPI lig listesinden dogrulandi.
-# api_name: API'nin league_name filtresinde kullanilan
-# tam lig adi.
-# =========================================================
+# =====================================================
 
 LEAGUES = [
     {"code": "l7c", "country": "Türkiye", "league": "Süper Lig", "api_name": "Turkey: Super Lig"},
@@ -69,160 +74,174 @@ LEAGUES = [
     {"code": "laz", "country": "Avrupa", "league": "Konferans Ligi", "api_name": "Europe: Conference League - League Phase"},
 ]
 
-# =========================================================
-# TARIH ARALIGI
-# Son 7 gun + bugun + gelecek 7 gun
-# =========================================================
 
-TODAY = datetime.now(timezone.utc).date()
-DATE_FROM = (TODAY - timedelta(days=7)).isoformat()
-DATE_TO = (TODAY + timedelta(days=7)).isoformat()
+# =====================================================
+# API ISTEK FONKSIYONU
+# =====================================================
 
-# =========================================================
-# YARDIMCI FONKSIYONLAR
-# =========================================================
+def api_get(path, params):
+    global last_request_time
 
-def api_get(path, params=None):
+    elapsed = time.time() - last_request_time
+    if last_request_time and elapsed < REQUEST_DELAY:
+        time.sleep(REQUEST_DELAY - elapsed)
+
     response = SESSION.get(
         BASE_URL + path,
         params=params,
-        timeout=45
+        timeout=50
     )
+    last_request_time = time.time()
 
     if response.status_code == 429:
-        wait_time = int(response.headers.get("Retry-After", 60))
-        print(f"API hiz siniri. {wait_time} saniye bekleniyor...")
-        time.sleep(wait_time)
+        wait = int(response.headers.get("Retry-After", 60))
+        print(f"API hiz siniri. {wait} saniye bekleniyor...")
+        time.sleep(wait)
+
         response = SESSION.get(
             BASE_URL + path,
             params=params,
-            timeout=45
+            timeout=50
         )
+        last_request_time = time.time()
 
     response.raise_for_status()
     payload = response.json()
 
     if not payload.get("success"):
-        raise RuntimeError(f"API basarisiz yanit verdi: {payload}")
+        raise RuntimeError(f"API hatasi: {payload}")
 
     return payload
 
 
-def team_name(team):
+# =====================================================
+# VERI YARDIMCILARI
+# =====================================================
+
+def get_team_name(team):
     if not isinstance(team, dict):
         return ""
-
-    return (
-        team.get("display_name")
-        or team.get("name")
-        or ""
-    )
+    return team.get("display_name") or team.get("name") or ""
 
 
-def team_key(name):
-    return re.sub(r"\s+", " ", str(name).strip().lower())
+def normalize_name(value):
+    return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+
+def get_referee(match):
+    referee = match.get("referee") or ""
+
+    if isinstance(referee, dict):
+        return referee.get("name") or ""
+
+    return str(referee).strip()
 
 
 def parse_score(value):
     if not value:
         return ""
 
-    match = re.search(r"(\d+)\s*[-:]\s*(\d+)", str(value))
-
-    if match:
-        return f"{match.group(1)}-{match.group(2)}"
+    found = re.search(r"(\d+)\s*[-:]\s*(\d+)", str(value))
+    if found:
+        return f"{found.group(1)}-{found.group(2)}"
 
     return ""
 
 
-def match_score(match):
+def get_score(match):
     score = parse_score(match.get("full_time_score"))
-
     if score:
         return score
 
     home = match.get("home_team") or {}
     away = match.get("away_team") or {}
 
-    home_score = home.get("score")
-    away_score = away.get("score")
+    h_score = home.get("score")
+    a_score = away.get("score")
 
-    if home_score is not None and away_score is not None:
-        return f"{home_score}-{away_score}"
+    if h_score is not None and a_score is not None:
+        return f"{h_score}-{a_score}"
 
     return ""
 
 
 def is_finished(match):
-    status_code = str(match.get("status_code") or "").lower()
+    code = str(match.get("status_code") or "").lower()
     status = str(match.get("status") or "").upper()
 
     return (
-        status_code in ["final", "finished", "after_extra_time", "after_penalties"]
-        or status in ["FT", "AET", "PEN", "FINISHED"]
+        code in {
+            "final", "finished",
+            "after_extra_time", "after_penalties"
+        }
+        or status in {"FT", "AET", "PEN", "FINISHED"}
     )
 
 
-def match_datetime(match):
-    date = str(match.get("start_date") or "")
-    clock = str(match.get("start_time") or "")
-    return f"{date} {clock}".strip()
+def get_sort_date(match):
+    value = (
+        match.get("start_at")
+        or match.get("start_date")
+        or ""
+    )
+
+    return str(value)
 
 
-def history_item(match):
-    home = team_name(match.get("home_team"))
-    away = team_name(match.get("away_team"))
-
+def make_history_item(match):
     return {
-        "date": match.get("start_date") or "",
-        "home": home,
-        "away": away,
-        "score": match_score(match),
-        "status": match.get("status") or "",
-        "league": match.get("league_name") or ""
+        "date": match.get("start_at") or match.get("start_date") or "",
+        "home": match["home"],
+        "away": match["away"],
+        "score": match["finalScore"],
+        "status": match["status"],
+        "league": match["league"]
     }
 
 
-# =========================================================
+# =====================================================
 # MACLARI CEK
-# =========================================================
+# =====================================================
+
+print("=" * 55)
+print("25 LIG MAC VE GECMIS VERI CEKIMI")
+print(f"Tarih araligi: {DATE_FROM} - {DATE_TO}")
+print("=" * 55)
 
 all_matches = []
-seen_matches = set()
-
-print("BULTEN GUNCELLEME BASLADI")
-print(f"Tarih araligi: {DATE_FROM} - {DATE_TO}")
-print(f"Hedef lig sayisi: {len(LEAGUES)}")
+seen_ids = set()
 
 for index, league in enumerate(LEAGUES, start=1):
     print(
-        f"[{index}/{len(LEAGUES)}] "
+        f"\n[{index}/{len(LEAGUES)}] "
         f"{league['country']} - {league['league']}"
     )
 
-    params = {
-        "league_name": league["api_name"],
-        "date_from": DATE_FROM,
-        "date_to": DATE_TO,
-        "limit": 100,
-        "order": "asc"
-    }
+    offset = 0
+    limit = 100
+    league_added = 0
 
-    try:
+    while True:
+        params = {
+            "league_name": league["api_name"],
+            "date_from": DATE_FROM,
+            "date_to": DATE_TO,
+            "limit": limit,
+            "offset": offset,
+            "order": "asc"
+        }
+
         payload = api_get("/soccer/matches", params)
         matches = payload.get("data", [])
 
-        added = 0
-
         for match in matches:
-            api_league_code = str(match.get("league_code") or "")
+            api_code = str(match.get("league_code") or "")
 
-            # Yanlis lig eslesmesini engelle.
-            if api_league_code and api_league_code != league["code"]:
+            if api_code and api_code != league["code"]:
                 continue
 
-            home = team_name(match.get("home_team"))
-            away = team_name(match.get("away_team"))
+            home = get_team_name(match.get("home_team"))
+            away = get_team_name(match.get("away_team"))
 
             if not home or not away:
                 continue
@@ -242,102 +261,95 @@ for index, league in enumerate(LEAGUES, start=1):
 
             match_id = str(match_id)
 
-            if match_id in seen_matches:
+            if match_id in seen_ids:
                 continue
 
-            seen_matches.add(match_id)
+            seen_ids.add(match_id)
 
             item = {
-                "_id": match_id,
-                "_team_home": team_key(home),
-                "_team_away": team_key(away),
-                "_referee": str(match.get("referee") or "").strip(),
-                "_finished": is_finished(match),
-                "_sort": match_datetime(match),
-
                 "id": match_id,
                 "country": league["country"],
                 "league": league["league"],
                 "date": match.get("start_at") or match.get("start_date") or "",
                 "home": home,
                 "away": away,
-                "referee": match.get("referee") or "",
+                "referee": get_referee(match),
                 "status": match.get("status") or "",
-                "finalScore": match_score(match),
+                "finalScore": get_score(match),
+
                 "homeMatches": [],
                 "awayMatches": [],
-                "refMatches": []
+                "refMatches": [],
+
+                "_home_key": normalize_name(home),
+                "_away_key": normalize_name(away),
+                "_ref_key": normalize_name(get_referee(match)),
+                "_finished": is_finished(match),
+                "_sort": get_sort_date(match)
             }
 
             all_matches.append(item)
-            added += 1
+            league_added += 1
 
-        print(f"  Bulunan mac: {len(matches)} | Eklenen: {added}")
+        print(
+            f"  Sayfa {offset // limit + 1}: "
+            f"{len(matches)} kayit"
+        )
 
-    except Exception as error:
-        print(f"  HATA: {error}")
-        raise
+        meta = payload.get("meta") or {}
+        total = meta.get("total")
 
-    # Ucretsiz API: dakikada 5 istek sinirina uy.
-    if index < len(LEAGUES):
-        time.sleep(12.5)
+        if total is not None:
+            if offset + len(matches) >= int(total):
+                break
+        elif len(matches) < limit:
+            break
+
+        if not matches:
+            break
+
+        offset += limit
+
+    print(f"  Bu ligden eklenen: {league_added}")
 
 
-# =========================================================
-# TAKIM VE HAKEM GECMISI
-# Yalnizca cekilen gercek maclardan olusturulur.
-# =========================================================
+# =====================================================
+# TAKIM VE HAKEM GECMISI OLUSTUR
+# =====================================================
 
-print("Takim ve hakem gecmisleri hazirlaniyor...")
+print("\nTakim ve hakem gecmisleri olusturuluyor...")
 
 all_matches.sort(key=lambda x: x["_sort"])
 
-for current in all_matches:
-    current_date = current["_sort"]
+team_history = {}
+referee_history = {}
 
-    home_key = current["_team_home"]
-    away_key = current["_team_away"]
-    referee_key = current["_referee"].lower()
+for match in all_matches:
+    home_key = match["_home_key"]
+    away_key = match["_away_key"]
+    referee_key = match["_ref_key"]
 
-    home_history = []
-    away_history = []
-    referee_history = []
+    home_previous = team_history.get(home_key, [])
+    away_previous = team_history.get(away_key, [])
+    referee_previous = referee_history.get(referee_key, [])
 
-    for previous in all_matches:
-        if previous["_sort"] >= current_date:
-            break
+    match["homeMatches"] = home_previous[-5:][::-1]
+    match["awayMatches"] = away_previous[-5:][::-1]
+    match["refMatches"] = referee_previous[-5:][::-1]
 
-        if not previous["_finished"]:
-            continue
+    if match["_finished"] and match["finalScore"]:
+        history = make_history_item(match)
 
-        previous_item = history_item(previous)
+        team_history.setdefault(home_key, []).append(history)
+        team_history.setdefault(away_key, []).append(history)
 
-        if home_key in (
-            previous["_team_home"],
-            previous["_team_away"]
-        ):
-            home_history.append(previous_item)
-
-        if away_key in (
-            previous["_team_home"],
-            previous["_team_away"]
-        ):
-            away_history.append(previous_item)
-
-        if (
-            referee_key
-            and previous["_referee"].lower() == referee_key
-        ):
-            referee_history.append(previous_item)
-
-    current["homeMatches"] = home_history[-5:][::-1]
-    current["awayMatches"] = away_history[-5:][::-1]
-    current["refMatches"] = referee_history[-5:][::-1]
+        if referee_key:
+            referee_history.setdefault(referee_key, []).append(history)
 
 
-# =========================================================
-# JSON OLUSTUR VE KAYDET
-# =========================================================
+# =====================================================
+# SON KONTROLLER
+# =====================================================
 
 if not all_matches:
     raise SystemExit(
@@ -345,7 +357,21 @@ if not all_matches:
         "Mevcut bulten.json korunuyor."
     )
 
-# Uygulamanin bekledigi alanlari birak.
+finished_count = sum(1 for m in all_matches if m["_finished"])
+upcoming_count = len(all_matches) - finished_count
+
+team_history_count = sum(
+    1 for m in all_matches
+    if m["homeMatches"] or m["awayMatches"]
+)
+
+ref_history_count = sum(
+    1 for m in all_matches if m["refMatches"]
+)
+
+league_count = len(set(m["league"] for m in all_matches))
+
+# Yardimci alanlari JSON'a yazma.
 output = []
 
 for match in all_matches:
@@ -364,14 +390,30 @@ for match in all_matches:
         "refMatches": match["refMatches"]
     })
 
-temporary_file = OUTPUT_FILE.with_suffix(".tmp")
 
-with temporary_file.open("w", encoding="utf-8") as file:
+# =====================================================
+# GUVENLI DOSYA KAYDI
+# =====================================================
+
+temp_file = OUTPUT_FILE.with_suffix(".tmp")
+
+with temp_file.open("w", encoding="utf-8") as file:
     json.dump(output, file, ensure_ascii=False, indent=2)
 
-temporary_file.replace(OUTPUT_FILE)
+temp_file.replace(OUTPUT_FILE)
 
-print("=" * 50)
-print(f"TOPLAM MAC: {len(output)}")
-print(f"ESLESTIRILEN LIG: {len(set(m['league'] for m in output))}")
-print("BULTEN.JSON BASARIYLA GUNCELLENDI.")
+
+# =====================================================
+# RAPOR
+# =====================================================
+
+print("\n" + "=" * 55)
+print("BULTEN GUNCELLEME TAMAMLANDI")
+print(f"Toplam mac: {len(output)}")
+print(f"Eslesen lig: {league_count}/25")
+print(f"Tamamlanan mac: {finished_count}")
+print(f"Gelecek veya devam eden mac: {upcoming_count}")
+print(f"Takim gecmisi bulunan mac: {team_history_count}")
+print(f"Hakem gecmisi bulunan mac: {ref_history_count}")
+print("bulten.json basariyla kaydedildi.")
+print("=" * 55)
