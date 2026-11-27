@@ -1,66 +1,114 @@
 [
-    {
-        "id": "m-guncel-1",
-        "country": "Türkiye",
-        "league": "Türkiye: Süper Lig",
-        "date": "2026-11-28 19:00",
-        "home": "Galatasaray",
-        "away": "Beşiktaş",
-        "referee": "Halil Umut Meler",
-        "status": "upcoming",
-        "finalScore": "",
-        "homeMatches": [
-            "1-0 (2-1)",
-            "0-1 (3-0)",
-            "1-0 (1-1)",
-            "0-1 (2-0)",
-            "1-0 (4-1)"
-        ],
-        "awayMatches": [
-            "1-0 (2-1)",
-            "1-1 (3-2)",
-            "0-1 (1-0)",
-            "0-0 (2-2)",
-            "1-0 (1-2)"
-        ],
-        "refMatches": [
-            "1-0 (2-1)",
-            "0-1 (1-2)",
-            "1-0 (3-1)",
-            "0-1 (0-1)",
-            "1-0 (2-0)"
-        ]
-    },
-    {
-        "id": "m-guncel-2",
-        "country": "İngiltere",
-        "league": "İngiltere: Premier Lig",
-        "date": "2026-11-28 21:30",
-        "home": "Manchester City",
-        "away": "Liverpool",
-        "referee": "Anthony Taylor",
-        "status": "upcoming",
-        "finalScore": "",
-        "homeMatches": [
-            "1-0 (3-1)",
-            "1-1 (2-2)",
-            "1-0 (2-0)",
-            "0-0 (1-1)",
-            "1-0 (4-0)"
-        ],
-        "awayMatches": [
-            "0-1 (1-2)",
-            "1-0 (2-1)",
-            "1-1 (3-3)",
-            "1-0 (2-0)",
-            "0-0 (1-1)"
-        ],
-        "refMatches": [
-            "0-0 (1-1)",
-            "1-0 (2-0)",
-            "0-1 (1-2)",
-            "1-1 (2-2)",
-            "1-0 (3-0)"
-        ]
-    }
+  {
+    "id": "ssa-None",
+    "country": "İngiltere",
+    "league": "İngiltere: Championship",
+    "date": "2026-11-27 11:30",
+    "home": "Broadmeadow",
+    "away": "Queensland Lions",
+    "referee": "Bilinmiyor",
+    "status": "upcoming",
+    "finalScore": "",
+    "homeMatches": [],
+    "awayMatches": [],
+    "refMatches": []
+  },
+  {
+    "id": "ssa-None",
+    "country": "Türkiye",
+    "league": "Türkiye: Süper Lig",
+    "date": "2026-11-27 12:30",
+    "home": "Sea Hawks",
+    "away": "Renown",
+    "referee": "Bilinmiyor",
+    "status": "upcoming",
+    "finalScore": "",
+    "homeMatches": [],
+    "awayMatches": [],
+    "refMatches": []
+  },
+  {
+    "id": "ssa-None",
+    "country": "İngiltere",
+    "league": "İngiltere: Premier Lig",
+    "date": "2026-11-27 13:30",
+    "home": "Imisli FK",
+    "away": "Safa Baku",
+    "referee": "Bilinmiyor",
+    "status": "upcoming",
+    "finalScore": "",
+    "homeMatches": [],
+    "awayMatches": [],
+    "refMatches": []
+  },
+  {
+    "id": "ssa-None",
+    "country": "İngiltere",
+    "league": "İngiltere: Premier Lig",
+    "date": "2026-11-27 14:00",
+    "home": "Van",
+    "away": "Syunik",
+    "referee": "Bilinmiyor",
+    "status": "upcoming",
+    "finalScore": "",
+    "homeMatches": [],
+    "awayMatches": [],
+    "refMatches": []
+  },
+  {
+    "id": "ssa-None",
+    "country": "İngiltere",
+    "league": "İngiltere: Premier Lig",
+    "date": "2026-11-27 14:00",
+    "home": "Livyi Bereg",
+    "away": "Kolos Kovalivka",
+    "referee": "Oleksandr Omelchenko, Ukraine",
+    "status": "upcoming",
+    "finalScore": "",
+    "homeMatches": [],
+    "awayMatches": [],
+    "refMatches": []
+  },
+  {
+    "id": "ssa-None",
+    "country": "İngiltere",
+    "league": "İngiltere: Premier Lig",
+    "date": "2026-11-27 14:30",
+    "home": "Geylang",
+    "away": "Tanjong Pagar",
+    "referee": "Bilinmiyor",
+    "status": "upcoming",
+    "finalScore": "",
+    "homeMatches": [],
+    "awayMatches": [],
+    "refMatches": []
+  },
+  {
+    "id": "ssa-None",
+    "country": "Belçika",
+    "league": "Belçika: Pro Lig",
+    "date": "2026-11-27 14:30",
+    "home": "Paykan",
+    "away": "Foolad",
+    "referee": "Bilinmiyor",
+    "status": "upcoming",
+    "finalScore": "",
+    "homeMatches": [],
+    "awayMatches": [],
+    "refMatches": []
+  },
+  {
+    "id": "ssa-None",
+    "country": "Belçika",
+    "league": "Belçika: Pro Lig",
+    "date": "2026-11-27 14:30",
+    "home": "Shams Azar Qazvin",
+    "away": "Kheybar Khorramabad",
+    "referee": "Bilinmiyor",
+    "status": "upcoming",
+    "finalScore": "",
+    "homeMatches": [],
+    "awayMatches": [],
+    "refMatches": []
+  }
 ]
