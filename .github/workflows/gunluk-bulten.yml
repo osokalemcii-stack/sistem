@@ -13,6 +13,7 @@ permissions:
 jobs:
   bulten-cek:
     runs-on: ubuntu-latest
+
     steps:
       - name: Depoyu indir
         uses: actions/checkout@v4
@@ -30,10 +31,14 @@ jobs:
           pip install requests
           python bulten_cek.py
 
-      - name: Bulten ve arsivi kaydet
+      - name: Analiz motorunu calistir
+        run: |
+          python analiz_motoru.py
+
+      - name: Bulten ve analiz dosyalarini kaydet
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add bulten.json bulten_history.json
-          git diff --staged --quiet || git commit -m "chore: bulten guncellendi"
+          git add bulten.json bulten_history.json analiz.json
+          git diff --staged --quiet || git commit -m "chore: bulten ve analiz guncellendi"
           git push
