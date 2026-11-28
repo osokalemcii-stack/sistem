@@ -359,7 +359,9 @@ def prediction_for_values(values):
         }
 
     return None
-    def venue_own_values(history, team_name, venue, field):
+
+
+def venue_own_values(history, team_name, venue, field):
     """
     Takımın yalnızca kendi belirlenen saha koşulundaki attığı/yediği gol.
     home/away alanları karşılaşmadaki takım adlarıdır.
@@ -580,9 +582,7 @@ def build_expectations(
         }
 
     return expectations, details
-
-
-# ============================================================
+    # ============================================================
 # SKOR KOSULLARI
 # ============================================================
 
@@ -837,7 +837,9 @@ def generate_alternative_scores(
             away_profile["sampleConceded"]
         )
     }
-    # ============================================================
+
+
+# ============================================================
 # ALTI SKORU BIRLESTIR VE SIRALA
 # ============================================================
 
@@ -920,9 +922,7 @@ def build_six_score_picks(
         item.pop("rawStrength", None)
 
     return selected, alternative_meta
-
-
-# ============================================================
+    # ============================================================
 # KURAL TARAMASI
 # ============================================================
 
@@ -1096,7 +1096,9 @@ def analyze_match(match):
         },
         "goalDataQuality": goal_data_quality
     }
-    # ============================================================
+
+
+# ============================================================
 # GUNLUK SISTEM TAHMINLERI
 # ============================================================
 
@@ -1243,9 +1245,7 @@ def build_system_predictions(matches, target_date):
             "aday sıralama puanıdır. Yeterli veri yoksa 12 maç tamamlanmaz."
         )
     }
-
-
-# ============================================================
+    # ============================================================
 # ANA PROGRAM
 # ============================================================
 
@@ -1393,3 +1393,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
