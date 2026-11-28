@@ -837,9 +837,7 @@ def generate_alternative_scores(
             away_profile["sampleConceded"]
         )
     }
-
-
-# ============================================================
+    # ============================================================
 # ALTI SKORU BIRLESTIR VE SIRALA
 # ============================================================
 
@@ -855,14 +853,28 @@ def build_six_score_picks(
         limit=60
     )
 
-    expected_home, expected_away, _, _ = expected_goals(
+    expected_home, expected_away, home_profile, away_profile = expected_goals(
         home_history,
         away_history,
         home_team_name,
         away_team_name
     )
 
-    if expected_home is not None and expected_away is not None:
+    sufficient_goal_data = all(
+        count >= MIN_SYSTEM_GOAL_SAMPLES
+        for count in (
+            home_profile["sampleScored"],
+            home_profile["sampleConceded"],
+            away_profile["sampleScored"],
+            away_profile["sampleConceded"]
+        )
+    )
+
+    if (
+        sufficient_goal_data
+        and expected_home is not None
+        and expected_away is not None
+    ):
         for item in main_scores:
             ht_home, ht_away = map(
                 int, item["halfTimeScore"].split("-")
@@ -922,7 +934,9 @@ def build_six_score_picks(
         item.pop("rawStrength", None)
 
     return selected, alternative_meta
-    # ============================================================
+
+
+# ============================================================
 # KURAL TARAMASI
 # ============================================================
 
@@ -1096,9 +1110,7 @@ def analyze_match(match):
         },
         "goalDataQuality": goal_data_quality
     }
-
-
-# ============================================================
+    # ============================================================
 # GUNLUK SISTEM TAHMINLERI
 # ============================================================
 
@@ -1245,7 +1257,9 @@ def build_system_predictions(matches, target_date):
             "aday sıralama puanıdır. Yeterli veri yoksa 12 maç tamamlanmaz."
         )
     }
-    # ============================================================
+
+
+# ============================================================
 # ANA PROGRAM
 # ============================================================
 
@@ -1295,8 +1309,25 @@ def main():
         )
 
         has_scores = bool(analysis["scoreScenarios"])
+        goal_quality = analysis["goalDataQuality"]
 
-        if not signals and not special and not has_expectation and not has_scores:
+        has_goal_data = all(
+            int(goal_quality.get(field) or 0) >= MIN_SYSTEM_GOAL_SAMPLES
+            for field in (
+                "homeScored",
+                "homeConceded",
+                "awayScored",
+                "awayConceded"
+            )
+        )
+
+        if (
+            not signals
+            and not special
+            and not has_expectation
+            and not has_scores
+            and not has_goal_data
+        ):
             continue
 
         results.append({
