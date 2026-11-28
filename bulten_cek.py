@@ -1,4 +1,3 @@
-
 import os
 import re
 import json
@@ -8,9 +7,10 @@ import requests
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# =====================================================
-# AYARLAR
-# =====================================================
+# ============================================================
+# TEK / CIFT ANALIZ MOTORU - VERI TOPLAYICI
+# 25 lig | 90 gun ilk yukleme | kota kontrollu devam mekanizmasi
+# ============================================================
 
 BASE_URL = "https://api.sportstatsapi.com/api/v1"
 API_KEY = os.getenv("SPORTSTATS_API_KEY")
@@ -32,23 +32,20 @@ TODAY = datetime.now(timezone.utc).date()
 BOOTSTRAP_DAYS = 90
 INCREMENTAL_DAYS = 7
 FUTURE_DAYS = 14
-
 HISTORY_LIMIT = 12
 PAGE_LIMIT = 100
+MAX_PAGES_PER_LEAGUE_PER_RUN = 3
 
-# 5 istek/dakika sınırına uygun.
 REQUEST_DELAY = 12.5
-
-# Günlük kotayı tek çalışmada tüketmemek için güvenlik sınırı.
 MAX_API_CALLS = 45
 
-last_request_time = 0
+last_request_time = 0.0
 api_call_count = 0
 
 
-# =====================================================
-# LİGLER
-# =====================================================
+# ============================================================
+# 25 LIG
+# ============================================================
 
 LEAGUES = [
     {"code":"l7c","country":"Türkiye","league":"Süper Lig","api_name":"Turkey: Super Lig"},
@@ -79,24 +76,37 @@ LEAGUES = [
 ]
 
 
-# =====================================================
-# YARDIMCI FONKSİYONLAR
-# =====================================================
+# ============================================================
+# GENEL YARDIMCILAR
+# ============================================================
 
 def log(message):
     print(message, flush=True)
 
 
 def normalize_name(value):
-    return re.sub(
-        r"\s+", " ",
-        str(value or "").strip().casefold()
-    )
+    return re.sub(r"\s+", " ", str(value or "").strip().casefold())
+
+
+def parse_score(value):
+    if value is None or value == "":
+        return None
+
+    found = re.search(r"(\d+)\s*[-:]\s*(\d+)", str(value))
+
+    if not found:
+        return None
+
+    return {
+        "home": int(found.group(1)),
+        "away": int(found.group(2))
+    }
 
 
 def team_name(team):
     if not isinstance(team, dict):
         return ""
+
     return team.get("display_name") or team.get("name") or ""
 
 
@@ -109,29 +119,11 @@ def referee_name(match):
     return str(value).strip()
 
 
-def parse_score(value):
-    if not value:
-        return None
-
-    found = re.search(
-        r"(\d+)\s*[-:]\s*(\d+)",
-        str(value)
-    )
-
-    if not found:
-        return None
-
-    return {
-        "home": int(found.group(1)),
-        "away": int(found.group(2))
-    }
-
-
 def get_full_score(match):
-    result = parse_score(match.get("full_time_score"))
+    score = parse_score(match.get("full_time_score"))
 
-    if result:
-        return result
+    if score:
+        return score
 
     home = match.get("home_team") or {}
     away = match.get("away_team") or {}
@@ -158,18 +150,20 @@ def get_status_code(match):
 
 def is_finished(match):
     code = get_status_code(match)
-    status = str(match.get("status") or "").strip().upper()
+    status = str(match.get("status") or "").strip().lower()
 
-    return (
-        code in {
-            "final", "finished",
-            "after_extra_time", "after_penalties",
-            "ft", "aet", "pen", "completed"
-        }
-        or status in {
-            "FT", "AET", "PEN", "FINISHED", "FINAL"
-        }
-    )
+    finished = {
+        "final",
+        "finished",
+        "after_extra_time",
+        "after_penalties",
+        "ft",
+        "aet",
+        "pen",
+        "completed"
+    }
+
+    return code in finished or status in finished
 
 
 def match_date(match):
@@ -192,8 +186,8 @@ def match_id(match, league, home, away, date):
         return str(value)
 
     return (
-        f"{league['code']}-"
-        f"{date}-{normalize_name(home)}-{normalize_name(away)}"
+        f"{league['code']}-{date}-"
+        f"{normalize_name(home)}-{normalize_name(away)}"
     )
 
 
@@ -204,13 +198,14 @@ def safe_json_load(path, default):
     try:
         with path.open("r", encoding="utf-8") as file:
             return json.load(file)
+
     except Exception as error:
         log(f"UYARI: {path} okunamadi: {error}")
         return default
 
 
 def save_json(path, data):
-    temp = path.with_suffix(".tmp")
+    temp = path.with_suffix(path.suffix + ".tmp")
 
     with temp.open("w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
@@ -218,9 +213,9 @@ def save_json(path, data):
     temp.replace(path)
 
 
-# =====================================================
-# API İSTEĞİ
-# =====================================================
+# ============================================================
+# API ERISIMI
+# ============================================================
 
 class DailyQuotaReached(Exception):
     pass
@@ -232,7 +227,8 @@ def api_get(path, params):
 
     if api_call_count >= MAX_API_CALLS:
         raise DailyQuotaReached(
-            f"Guvenlik siniri: {MAX_API_CALLS} API istegi."
+            f"Bu calistirmadaki guvenlik siniri "
+            f"({MAX_API_CALLS} istek) doldu."
         )
 
     elapsed = time.time() - last_request_time
@@ -255,25 +251,26 @@ def api_get(path, params):
         retry_after = response.headers.get("Retry-After", "")
 
         try:
-            wait = int(retry_after)
+            wait_seconds = int(retry_after)
         except (ValueError, TypeError):
-            wait = 0
+            wait_seconds = 0
 
-        if wait > 120:
+        if wait_seconds > 120:
             raise DailyQuotaReached(
-                f"API kota siniri. Retry-After: {wait} saniye. "
-                "Uzun bekleme yapilmadi."
+                f"API kota bekleme suresi {wait_seconds} saniye. "
+                "Uzun bekleme yapilmadi; ilerleme kaydedilecek."
             )
 
         raise DailyQuotaReached(
-            "API 429 yaniti verdi. Kota veya hiz siniri."
+            "API 429 yaniti verdi. Hiz veya kota siniri; "
+            "ilerleme kaydedilecek."
         )
 
     response.raise_for_status()
 
     payload = response.json()
 
-    if not payload.get("success"):
+    if not isinstance(payload, dict) or not payload.get("success"):
         raise RuntimeError(
             f"API basarisiz yanit verdi: {payload}"
         )
@@ -281,18 +278,16 @@ def api_get(path, params):
     return payload
 
 
-# =====================================================
-# ARŞİVİ YÜKLE
-# =====================================================
+# ============================================================
+# ARSIVI VE DEVAM DURUMUNU YUKLE
+# ============================================================
 
 archive_data = safe_json_load(ARCHIVE_FILE, {})
 
-if isinstance(archive_data, dict):
-    archived_matches = archive_data.get("matches", [])
-else:
-    archived_matches = []
+if not isinstance(archive_data, dict):
+    archive_data = {}
 
-# Eski bulten.json dosyasından da kayıt kurtarmayı dene.
+archived_matches = archive_data.get("matches", [])
 old_bulletin = safe_json_load(OUTPUT_FILE, [])
 
 if not archived_matches and isinstance(old_bulletin, list):
@@ -301,69 +296,134 @@ if not archived_matches and isinstance(old_bulletin, list):
 archive = {}
 
 for item in archived_matches:
-    if not isinstance(item, dict):
-        continue
-
-    item_id = item.get("id")
-
-    if item_id:
-        archive[str(item_id)] = item
+    if isinstance(item, dict) and item.get("id"):
+        archive[str(item["id"])] = item
 
 
-# =====================================================
-# İLK YÜKLEME / GÜNLÜK GÜNCELLEME
-# =====================================================
+state = archive_data.get("collectorState")
 
-bootstrap = len(archive) == 0
-
-if bootstrap:
-    date_from = (
-        TODAY - timedelta(days=BOOTSTRAP_DAYS)
-    ).isoformat()
-
-    mode = "ILK VERI YUKLEMESI"
-
-else:
-    date_from = (
-        TODAY - timedelta(days=INCREMENTAL_DAYS)
-    ).isoformat()
-
-    mode = "ARTIMSAL GUNCELLEME"
+if not isinstance(state, dict):
+    state = {}
 
 
-date_to = (
-    TODAY + timedelta(days=FUTURE_DAYS)
-).isoformat()
+if not state.get("cycleDateFrom") or not state.get("cycleDateTo"):
+    state = {
+        "bootstrapComplete": False,
+        "cycleMode": "bootstrap",
+        "cycleDateFrom": (
+            TODAY - timedelta(days=BOOTSTRAP_DAYS)
+        ).isoformat(),
+        "cycleDateTo": (
+            TODAY + timedelta(days=FUTURE_DAYS)
+        ).isoformat(),
+        "completedLeagues": [],
+        "nextOffsets": {},
+        "failedLeagues": []
+    }
 
-log("=" * 60)
-log("GERCEK FUTBOL VERISI TOPLANIYOR")
+
+if (
+    state.get("bootstrapComplete")
+    and len(state.get("completedLeagues", [])) == len(LEAGUES)
+):
+    state.update({
+        "cycleMode": "incremental",
+        "cycleDateFrom": (
+            TODAY - timedelta(days=INCREMENTAL_DAYS)
+        ).isoformat(),
+        "cycleDateTo": (
+            TODAY + timedelta(days=FUTURE_DAYS)
+        ).isoformat(),
+        "completedLeagues": [],
+        "nextOffsets": {},
+        "failedLeagues": []
+    })
+
+
+if (
+    state.get("bootstrapComplete")
+    and state.get("cycleMode") != "incremental"
+):
+    state.update({
+        "cycleMode": "incremental",
+        "cycleDateFrom": (
+            TODAY - timedelta(days=INCREMENTAL_DAYS)
+        ).isoformat(),
+        "cycleDateTo": (
+            TODAY + timedelta(days=FUTURE_DAYS)
+        ).isoformat(),
+        "completedLeagues": [],
+        "nextOffsets": {},
+        "failedLeagues": []
+    })
+
+
+date_from = state["cycleDateFrom"]
+date_to = state["cycleDateTo"]
+
+mode = (
+    "ILK YUKLEME / DEVAM"
+    if not state.get("bootstrapComplete")
+    else "GUNLUK GUNCELLEME"
+)
+
+
+def persist_archive():
+    save_json(
+        ARCHIVE_FILE,
+        {
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+            "collectorState": state,
+            "matches": list(archive.values())
+        }
+    )
+
+
+log("=" * 64)
+log("FUTBOL VERISI TOPLAMA BASLADI")
 log(f"Mod: {mode}")
 log(f"Tarih araligi: {date_from} - {date_to}")
-log(f"Arsivdeki mevcut mac: {len(archive)}")
-log("=" * 60)
+log(f"Arsivdeki mac: {len(archive)}")
+log(
+    f"Tamamlanan lig: "
+    f"{len(state.get('completedLeagues', []))}/{len(LEAGUES)}"
+)
+log("=" * 64)
 
 
-# =====================================================
-# LİGLERDEN VERİ AL
-# =====================================================
+# ============================================================
+# LIGLERI KALDIGI YERDEN TARA
+# ============================================================
+
+completed = set(state.get("completedLeagues", []))
+offsets = state.setdefault("nextOffsets", {})
 
 league_errors = []
 successful_leagues = 0
 new_count = 0
 quota_error = None
 
-for index, league in enumerate(LEAGUES, start=1):
 
-    log(
-        f"\n[{index}/{len(LEAGUES)}] "
-        f"{league['country']} - {league['league']}"
-    )
+for league_index, league in enumerate(LEAGUES, start=1):
 
-    offset = 0
+    code = league["code"]
+
+    if code in completed:
+        continue
+
+    offset = int(offsets.get(code, 0))
+    pages_this_run = 0
     league_added = 0
 
+    log(
+        f"\n[{league_index}/{len(LEAGUES)}] "
+        f"{league['country']} - {league['league']} "
+        f"| offset={offset}"
+    )
+
     try:
-        while True:
+
+        while pages_this_run < MAX_PAGES_PER_LEAGUE_PER_RUN:
 
             params = {
                 "league_name": league["api_name"],
@@ -385,7 +445,7 @@ for index, league in enumerate(LEAGUES, start=1):
 
                 api_code = str(raw.get("league_code") or "")
 
-                if api_code and api_code != league["code"]:
+                if api_code and api_code != code:
                     continue
 
                 home = team_name(raw.get("home_team"))
@@ -397,7 +457,11 @@ for index, league in enumerate(LEAGUES, start=1):
                 date = match_date(raw)
 
                 item_id = match_id(
-                    raw, league, home, away, date
+                    raw,
+                    league,
+                    home,
+                    away,
+                    date
                 )
 
                 full = get_full_score(raw)
@@ -407,7 +471,7 @@ for index, league in enumerate(LEAGUES, start=1):
                     "id": item_id,
                     "country": league["country"],
                     "league": league["league"],
-                    "leagueCode": league["code"],
+                    "leagueCode": code,
                     "date": date,
                     "home": home,
                     "away": away,
@@ -430,6 +494,8 @@ for index, league in enumerate(LEAGUES, start=1):
                 archive[item_id] = item
                 league_added += 1
 
+            pages_this_run += 1
+
             log(
                 f"  Sayfa {offset // PAGE_LIMIT + 1}: "
                 f"{len(page)} mac"
@@ -439,62 +505,101 @@ for index, league in enumerate(LEAGUES, start=1):
             total = meta.get("total")
 
             if not page:
+                offsets.pop(code, None)
+                completed.add(code)
+                state["completedLeagues"] = sorted(completed)
+                persist_archive()
                 break
 
-            if total is not None:
-                if offset + len(page) >= int(total):
-                    break
-            elif len(page) < PAGE_LIMIT:
+            next_offset = offset + len(page)
+
+            if total is not None and next_offset >= int(total):
+                offsets.pop(code, None)
+                completed.add(code)
+                state["completedLeagues"] = sorted(completed)
+                persist_archive()
                 break
 
-            offset += PAGE_LIMIT
-
-            # Her lig için en fazla 3 sayfa.
-            if offset >= PAGE_LIMIT * 3:
-                log("  Sayfa guvenlik sinirina ulasildi.")
+            if total is None and len(page) < PAGE_LIMIT:
+                offsets.pop(code, None)
+                completed.add(code)
+                state["completedLeagues"] = sorted(completed)
+                persist_archive()
                 break
+
+            offset = next_offset
+            offsets[code] = offset
+            persist_archive()
+
+        if code not in completed:
+            log(
+                f"  Devam konumu kaydedildi: "
+                f"sonraki offset {offset}"
+            )
+
+        successful_leagues += 1
+
+        log(
+            f"  Bu calismada islenen kayit: "
+            f"{league_added}"
+        )
 
     except DailyQuotaReached as error:
+
         quota_error = str(error)
-        log(f"API KOTA DURDURMASI: {quota_error}")
+        log(f"\nKOTA/HIZ SINIRI: {quota_error}")
+        persist_archive()
         break
 
     except Exception as error:
+
         league_errors.append(
             f"{league['league']}: {error}"
         )
+
+        state.setdefault("failedLeagues", []).append({
+            "league": code,
+            "error": str(error),
+            "time": datetime.now(timezone.utc).isoformat()
+        })
+
         log(f"  LIG HATASI: {error}")
+        persist_archive()
         continue
 
-    successful_leagues += 1
 
-    log(f"  Bu ligden eklenen/guncellenen: {league_added}")
+# ============================================================
+# ILK YUKLEME TAMAMLANDI MI?
+# ============================================================
+
+if len(completed) == len(LEAGUES):
+
+    if not state.get("bootstrapComplete"):
+        state["bootstrapComplete"] = True
+        log("\n90 gunluk ilk yukleme 25 lig icin tamamlandi.")
+
+    state.update({
+        "cycleMode": "incremental",
+        "cycleDateFrom": (
+            TODAY - timedelta(days=INCREMENTAL_DAYS)
+        ).isoformat(),
+        "cycleDateTo": (
+            TODAY + timedelta(days=FUTURE_DAYS)
+        ).isoformat(),
+        "completedLeagues": [],
+        "nextOffsets": {},
+        "failedLeagues": []
+    })
 
 
-# =====================================================
-# KOTA VE HATA KONTROLÜ
-# =====================================================
-
-if quota_error:
-    raise SystemExit(
-        "\nVERI TOPLAMA DURDURULDU.\n"
-        f"Neden: {quota_error}\n"
-        "Mevcut arsiv ve bulten dosyalari korunuyor."
-    )
-
-if successful_leagues == 0:
-    raise SystemExit(
-        "HATA: Hicbir ligden veri alinamadi. "
-        "Mevcut dosyalar korunuyor."
-    )
+persist_archive()
 
 
-# =====================================================
-# ARŞİVİ TEMİZLE
-# =====================================================
+# ============================================================
+# ARSIVI TEMIZLE VE GECMISI OLUSTUR
+# ============================================================
 
-# 180 günden eski kayıtları arşivden çıkar.
-archive_cutoff = TODAY - timedelta(days=180)
+cutoff = TODAY - timedelta(days=180)
 
 clean_archive = {}
 
@@ -509,29 +614,21 @@ for item_id, item in archive.items():
     except Exception:
         continue
 
-    if parsed >= archive_cutoff:
+    if parsed >= cutoff:
         clean_archive[item_id] = item
+
 
 archive = clean_archive
 
-
-# =====================================================
-# TARİHE GÖRE SIRALA
-# =====================================================
-
-all_matches = list(archive.values())
-
-all_matches.sort(
+all_matches = sorted(
+    archive.values(),
     key=lambda x: x.get("date") or ""
 )
 
 
-# =====================================================
-# TAKIM VE HAKEM GEÇMİŞLERİ
-# =====================================================
-
 team_history = {}
 referee_history = {}
+
 
 def history_item(match, team_key=None):
 
@@ -545,16 +642,25 @@ def history_item(match, team_key=None):
     away_key = normalize_name(match.get("away"))
 
     if team_key == home_key:
-        for_ht, against_ht = ht["home"], ht["away"]
-        for_ft, against_ft = ft["home"], ft["away"]
+
+        goals_ht = ht["home"]
+        against_ht = ht["away"]
+        goals_ft = ft["home"]
+        against_ft = ft["away"]
 
     elif team_key == away_key:
-        for_ht, against_ht = ht["away"], ht["home"]
-        for_ft, against_ft = ft["away"], ft["home"]
+
+        goals_ht = ht["away"]
+        against_ht = ht["home"]
+        goals_ft = ft["away"]
+        against_ft = ft["home"]
 
     else:
-        for_ht = against_ht = None
-        for_ft = against_ft = None
+
+        goals_ht = None
+        against_ht = None
+        goals_ft = None
+        against_ft = None
 
     return {
         "date": match.get("date"),
@@ -566,9 +672,9 @@ def history_item(match, team_key=None):
         "finalScore": (
             f"{ft['home']}-{ft['away']}"
         ),
-        "teamGoalsHT": for_ht,
+        "teamGoalsHT": goals_ht,
         "opponentGoalsHT": against_ht,
-        "teamGoalsFT": for_ft,
+        "teamGoalsFT": goals_ft,
         "opponentGoalsFT": against_ft,
         "league": match.get("league"),
         "referee": match.get("referee")
@@ -604,20 +710,25 @@ for match in all_matches:
     ref_item = history_item(match)
 
     if home_item:
-        team_history.setdefault(home_key, []).append(home_item)
+        team_history.setdefault(
+            home_key, []
+        ).append(home_item)
 
     if away_item:
-        team_history.setdefault(away_key, []).append(away_item)
+        team_history.setdefault(
+            away_key, []
+        ).append(away_item)
 
     if ref_key and ref_item:
-        referee_history.setdefault(ref_key, []).append(ref_item)
+        referee_history.setdefault(
+            ref_key, []
+        ).append(ref_item)
 
 
-# =====================================================
-# BÜLTEN VE ARŞİV DOSYALARI
-# =====================================================
+# ============================================================
+# BULTEN VE ARSIV DOSYALARINI YAZ
+# ============================================================
 
-# Geçmiş maçlar ve gelecek fikstürler birlikte tutulur.
 output = []
 
 for match in all_matches:
@@ -640,27 +751,13 @@ for match in all_matches:
     })
 
 
-if not output:
-    raise SystemExit(
-        "HATA: Bulten bos. Onceki dosyalar korunuyor."
-    )
-
-
-# Önce geçici dosyalara yaz, sonra güvenli değiştir.
-save_json(
-    ARCHIVE_FILE,
-    {
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "matches": all_matches
-    }
-)
-
 save_json(OUTPUT_FILE, output)
+persist_archive()
 
 
-# =====================================================
+# ============================================================
 # RAPOR
-# =====================================================
+# ============================================================
 
 finished_count = sum(
     1 for m in all_matches if is_finished(m)
@@ -688,28 +785,35 @@ ref_history_count = sum(
 )
 
 league_count = len(
-    set(m.get("league") for m in all_matches)
+    set(m.get("league") for m in all_matches if m.get("league"))
 )
 
-log("\n" + "=" * 60)
-log("BULTEN TOPLAMA TAMAMLANDI")
+
+log("\n" + "=" * 64)
+log("VERI TOPLAMA RAPORU")
 log(f"Mod: {mode}")
-log(f"API istegi: {api_call_count}")
-log(f"Basarili lig: {successful_leagues}/25")
-log(f"Toplam arsiv maci: {len(all_matches)}")
-log(f"Yeni mac kaydi: {new_count}")
-log(f"Eslesen lig: {league_count}/25")
+log(
+    f"Bu calismadaki API istegi: "
+    f"{api_call_count}/{MAX_API_CALLS}"
+)
+log(f"Tamamlanan lig: {len(completed)}/{len(LEAGUES)}")
+log(f"Arsivdeki mac: {len(all_matches)}")
+log(f"Bu calismada yeni mac: {new_count}")
+log(f"Arsivde eslesen lig: {league_count}/{len(LEAGUES)}")
 log(f"Tamamlanan mac: {finished_count}")
 log(f"IY skoru bulunan: {ht_count}")
 log(f"MS skoru bulunan: {ft_count}")
 log(f"Hakem bilgisi bulunan: {ref_count}")
-log(f"Takim gecmisi bulunan: {team_history_count}")
-log(f"Hakem gecmisi bulunan: {ref_history_count}")
+log(f"Takim gecmisi bulunan mac: {team_history_count}")
+log(f"Hakem gecmisi bulunan mac: {ref_history_count}")
+
+if quota_error:
+    log(f"Kota nedeniyle durdu: {quota_error}")
 
 if league_errors:
-    log("\nHATA ALINAN LIGLER:")
+    log("Hata alinan ligler:")
     for error in league_errors:
         log(" - " + error)
 
-log("\nbulten.json ve bulten_history.json kaydedildi.")
-log("=" * 60)
+log("Arsiv ve bulten dosyalari kaydedildi.")
+log("=" * 64)
