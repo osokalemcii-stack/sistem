@@ -593,3 +593,295 @@ def build_expectations(
 def score_matches_expectations(ht_home, ht_away, ft_home, ft_away, expectations):
     values = {
         "İY": ht_home + ht_away,
+                "İY EV": ht_home,
+        "İY DEP": ht_away,
+        "MS": ft_home + ft_away,
+        "MS EV": ft_home,
+        "MS DEP": ft_away
+    }
+
+    for market, expected in expectations.items():
+        if expected in ("TEK", "ÇİFT"):
+            if parity(values[market]) != expected:
+                return False
+
+    return True
+
+
+def generate_main_score_scenarios(expectations, limit=60):
+    # Altı piyasanın tamamı değişkense ana sistemin kesin bir kararı yoktur.
+    # Bu durumda ana sistem skor üretmez; alternatif analize alan açılır.
+    if not any(value in ("TEK", "ÇİFT") for value in expectations.values()):
+        return []
+
+    scenarios = []
+
+    for ht_home in range(5):
+        for ht_away in range(5):
+            for ft_home in range(ht_home, 7):
+                for ft_away in range(ht_away, 7):
+                    if not score_matches_expectations(
+                        ht_home, ht_away, ft_home, ft_away, expectations
+                    ):
+                        continue
+
+                    scenarios.append({
+                        "halfTimeScore": f"{ht_home}-{ht_away}",
+                        "finalScore": f"{ft_home}-{ft_away}",
+                        "source": "ANA SİSTEM"
+                    })
+
+    scenarios.sort(
+        key=lambda item: (
+            sum(int(x) for x in item["finalScore"].split("-")),
+            sum(int(x) for x in item["halfTimeScore"].split("-"))
+        )
+    )
+
+    return scenarios[:limit]
+
+
+# ============================================================
+# TAKIM GOL VERISI VE ALTERNATIF ANALIZ
+# ============================================================
+
+def average(values):
+    clean = [float(value) for value in values if value is not None]
+
+    if not clean:
+        return None
+
+    return sum(clean) / len(clean)
+
+
+def team_goal_samples(history, team_name, venue, field):
+    """
+    home/away alanları takım adı tuttuğu için saha ayrımı takım adıyla yapılır.
+    """
+    values = []
+
+    # Gol ortalaması yakın dönem formu için son 12 maçla sınırlıdır.
+    for item in ordered(history)[-RECENT_FORM_LIMIT:]:
+        if venue == "home" and item.get("home") != team_name:
+            continue
+        if venue == "away" and item.get("away") != team_name:
+            continue
+
+        value = item.get(field)
+
+        if value is not None:
+            try:
+                values.append(float(value))
+            except (ValueError, TypeError):
+                continue
+
+    return values
+
+
+def team_profile(history, team_name, venue):
+    scored = team_goal_samples(history, team_name, venue, "teamGoalsFT")
+    conceded = team_goal_samples(history, team_name, venue, "opponentGoalsFT")
+
+    if len(scored) < 3:
+        scored = team_goal_samples(history, team_name, "all", "teamGoalsFT")
+
+    if len(conceded) < 3:
+        conceded = team_goal_samples(history, team_name, "all", "opponentGoalsFT")
+
+    return {
+        "scored": average(scored),
+        "conceded": average(conceded),
+        "sampleScored": len(scored),
+        "sampleConceded": len(conceded)
+    }
+
+
+def expected_goals(home_history, away_history, home_team_name, away_team_name):
+    home = team_profile(home_history, home_team_name, "home")
+    away = team_profile(away_history, away_team_name, "away")
+
+    home_inputs = [home["scored"], away["conceded"]]
+    away_inputs = [away["scored"], home["conceded"]]
+
+    home_inputs = [value for value in home_inputs if value is not None]
+    away_inputs = [value for value in away_inputs if value is not None]
+
+    return average(home_inputs), average(away_inputs), home, away
+
+
+def poisson_probability(goals, expected):
+    if expected is None or expected < 0:
+        return 0.0
+
+    expected = max(0.05, min(expected, 5.0))
+
+    return (
+        math.exp(-expected)
+        * (expected ** goals)
+        / math.factorial(goals)
+    )
+
+
+def score_data_strength(ht_home, ht_away, ft_home, ft_away,
+                        expected_home, expected_away):
+    if expected_home is None or expected_away is None:
+        return 0.0
+
+    ft_probability = (
+        poisson_probability(ft_home, expected_home)
+        * poisson_probability(ft_away, expected_away)
+    )
+
+    ht_probability = (
+        poisson_probability(ht_home, expected_home * 0.45)
+        * poisson_probability(ht_away, expected_away * 0.45)
+    )
+
+    return ft_probability * ht_probability
+
+
+def generate_alternative_scores(
+    expectations,
+    home_history,
+    away_history,
+    home_team_name,
+    away_team_name,
+    excluded,
+    limit=60
+):
+    expected_home, expected_away, home_profile, away_profile = (
+        expected_goals(
+            home_history, away_history, home_team_name, away_team_name
+        )
+    )
+
+    minimum_samples = 3
+    sample_counts = {
+        "homeScored": home_profile["sampleScored"],
+        "homeConceded": home_profile["sampleConceded"],
+        "awayScored": away_profile["sampleScored"],
+        "awayConceded": away_profile["sampleConceded"]
+    }
+
+    insufficient = {
+        name: count
+        for name, count in sample_counts.items()
+        if count < minimum_samples
+    }
+
+    if (
+        expected_home is None
+        or expected_away is None
+        or insufficient
+    ):
+        return [], {
+            "available": False,
+            "reason": (
+                "Alternatif tahmin için ev ve deplasman takımlarının "
+                "attığı ve yediği gollerde ayrı ayrı en az 3 geçerli maç "
+                "verisi gerekiyor."
+            ),
+            "homeExpectedGoals": expected_home,
+            "awayExpectedGoals": expected_away,
+            "sampleCounts": sample_counts,
+            "minimumSamples": minimum_samples
+        }
+
+    candidates = []
+
+    for ht_home in range(5):
+        for ht_away in range(5):
+            for ft_home in range(ht_home, 7):
+                for ft_away in range(ht_away, 7):
+                    if not score_matches_expectations(
+                        ht_home, ht_away, ft_home, ft_away, expectations
+                    ):
+                        continue
+
+                    key = (
+                        f"{ht_home}-{ht_away}",
+                        f"{ft_home}-{ft_away}"
+                    )
+
+                    if key in excluded:
+                        continue
+
+                    strength = score_data_strength(
+                        ht_home,
+                        ht_away,
+                        ft_home,
+                        ft_away,
+                        expected_home,
+                        expected_away
+                    )
+
+                    if strength <= 0:
+                        continue
+
+                    candidates.append({
+                        "halfTimeScore": key[0],
+                        "finalScore": key[1],
+                        "source": "ALTERNATİF ANALİZ",
+                        "rawStrength": strength
+                    })
+
+    candidates.sort(
+        key=lambda item: item["rawStrength"],
+        reverse=True
+    )
+
+    return candidates[:limit], {
+        "available": True,
+        "reason": None,
+        "homeExpectedGoals": round(expected_home, 2),
+        "awayExpectedGoals": round(expected_away, 2),
+        "homeSamples": min(
+            home_profile["sampleScored"],
+            home_profile["sampleConceded"]
+        ),
+        "awaySamples": min(
+            away_profile["sampleScored"],
+            away_profile["sampleConceded"]
+        )
+    }
+
+
+# ============================================================
+# ALTI SKORU BIRLESTIR VE SIRALA
+# ============================================================
+
+def build_six_score_picks(
+    expectations,
+    home_history,
+    away_history,
+    home_team_name,
+    away_team_name
+):
+    main_scores = generate_main_score_scenarios(
+        expectations,
+        limit=60
+    )
+
+    expected_home, expected_away, _, _ = expected_goals(
+        home_history,
+        away_history,
+        home_team_name,
+        away_team_name
+    )
+
+    if expected_home is not None and expected_away is not None:
+        for item in main_scores:
+            ht_home, ht_away = map(
+                int, item["halfTimeScore"].split("-")
+            )
+            ft_home, ft_away = map(
+                int, item["finalScore"].split("-")
+            )
+
+            item["rawStrength"] = score_data_strength(
+                ht_home, ht_away, ft_home, ft_away,
+                expected_home, expected_away
+            )
+
+        main_scores.sort(
+            key=lambda item: item.get("rawStrength", 0),
