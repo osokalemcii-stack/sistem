@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -174,6 +175,24 @@ function allSpecial(match){const a=getAnalysis(match);return a&&Array.isArray(a.
 function matchSignalCount(match){const a=getAnalysis(match);return a?Number(a.signalCount??(a.signals||[]).length):0;}
 function maxLength(match,kind){const a=getAnalysis(match);if(!a)return 0;const list=(a.signals||[]).filter(s=>!kind||s.kind===kind);return Math.max(0,...list.map(s=>Number(s.currentLength??s.length??s.seriesLength??0)),...(kind==="SERİ"?(a.specialSeries||[]).map(s=>Number(s.length??s.currentLength??0)):[]));}
 function sortMatches(matches){const mode=$("sort").value;return [...matches].sort((a,b)=>{if(mode==="new"||mode==="old"){const da=dateValue(a.date)?.getTime()??Infinity,db=dateValue(b.date)?.getTime()??Infinity;return mode==="new"?da-db:db-da;}return matchSignalCount(b)-matchSignalCount(a)||maxLength(b,"SERİ")-maxLength(a,"SERİ")||maxLength(b,"ÖRÜNTÜ")-maxLength(a,"ÖRÜNTÜ")||(dateValue(a.date)?.getTime()??Infinity)-(dateValue(b.date)?.getTime()??Infinity);});}
+
+/* KATEGORİ SIRALAMASI:
+   1) En uzun seri/örüntü
+   2) En yüksek sinyal sayısı
+   3) Tarihi en yakın maç
+   Bu sıralama ana maç listesinin sırasını değiştirmez. */
+function categoryRank(matches,kind){
+ return [...matches].sort((a,b)=>{
+  const lengthDifference=maxLength(b,kind)-maxLength(a,kind);
+  if(lengthDifference!==0)return lengthDifference;
+  const signalDifference=matchSignalCount(b)-matchSignalCount(a);
+  if(signalDifference!==0)return signalDifference;
+  const dateA=dateValue(a.date)?.getTime()??Infinity;
+  const dateB=dateValue(b.date)?.getTime()??Infinity;
+  return dateA-dateB;
+ });
+}
+
 function sequenceHTML(sequence){if(!Array.isArray(sequence)||!sequence.length)return"";return `<div class="sequence">${sequence.map(v=>`<span class="${String(v).toUpperCase()==="TEK"?"odd":"even"}">${safe(v)}</span>`).join("")}</div>`;}
 function card(match){const a=getAnalysis(match),signals=allSignals(match),special=allSpecial(match),count=matchSignalCount(match),max=Math.max(maxLength(match,"SERİ"),maxLength(match,"ÖRÜNTÜ"));return `<article class="match" role="button" tabindex="0" onclick="openDetailById('${safe(match.id)}')" onkeydown="if(event.key==='Enter'){openDetailById('${safe(match.id)}')}"><div class="matchhead"><span class="league">${safe(match.country||"")} · ${safe(match.league||"")}</span><span class="date">${dateText(match.date)}</span></div><div class="teams"><div class="team">${safe(match.home||"Ev sahibi")}</div><div><div class="score">VS</div><div class="status">MAÇ</div></div><div class="team">${safe(match.away||"Deplasman")}</div></div><div class="details"><span class="pill">${count} sinyal</span><span class="pill gold">En uzun seri/örüntü: ${max}</span><span class="pill">${special.length} özel seri</span></div></article>`;}
 function summaryFor(match,analysis){if(!analysis)return"Bu maç için ayrıntılı analiz kaydı bulunamadı.";return analysis.summary||`${matchSignalCount(match)} sinyal bulundu. En uzun seri/örüntü uzunluğu ${Math.max(maxLength(match,"SERİ"),maxLength(match,"ÖRÜNTÜ"))}.`;}
@@ -186,9 +205,75 @@ function closeDetail(){$("detailScreen").classList.remove("open");document.body.
 function toggleFinished(){showFinished=!showFinished;$("finishedBtn").textContent=showFinished?"🟢 Gelecek Maçları Göster":"🏁 Biten Maçları Göster";render();}
 function renderCategory(elementId,countId,matches,emptyText){$(countId).textContent=matches.length;$(elementId).innerHTML=matches.length?matches.map(m=>card(m)).join(""):`<div class="empty">${safe(emptyText)}</div>`;}
 function renderSystemPredictions(){const groupsElement=$("systemPredictionGroups");if(!systemPredictions||!Array.isArray(systemPredictions.groups)){$("systemPredictionCount").textContent="0";$("systemPredictionNote").textContent="Günlük sistem tahmin verisi analiz.json içinde bulunamadı." ;groupsElement.innerHTML='<div class="empty">Sistem tahmini henüz oluşturulmadı.</div>';return;}const search=$("search").value.toLocaleLowerCase("tr"),league=$("league").value;const groups=systemPredictions.groups.map(g=>({...g,matches:(g.matches||[]).filter(m=>{const text=[m.home,m.away,m.league,m.country].join(" ").toLocaleLowerCase("tr");return (!search||text.includes(search))&&(!league||m.league===league)&&dateMatches(m);})})).filter(g=>g.matches.length);const count=groups.reduce((n,g)=>n+g.matches.length,0);$("systemPredictionCount").textContent=count;$("systemPredictionNote").textContent=`Tahmin tarihi: ${safe(systemPredictions.date||"Bilinmiyor")} · ${count} maç gösteriliyor · ${safe(systemPredictions.note||"Seçim puanı gerçek olasılık değildir.")}`;groupsElement.innerHTML=count?groups.map(g=>`<div class="system-group"><h3>${safe(g.title||("Grup "+g.group))}</h3>${g.matches.map(m=>`<article class="system-pick" role="button" tabindex="0" onclick="openDetailById('${safe(m.id)}')" onkeydown="if(event.key==='Enter'){openDetailById('${safe(m.id)}')}"><div class="system-pick-head"><span>${safe(m.country||"")} · ${safe(m.league||"")}</span><span>${dateText(m.date)}</span></div><div class="system-pick-teams">${safe(m.home||"Ev sahibi")} – ${safe(m.away||"Deplasman")}</div><div class="system-pick-score">${safe(m.halfTimeScore||"-")} / ${safe(m.finalScore||"-")}</div><div class="system-pick-meta">İY / MS birleşik skor · Seçim puanı: ${safe(m.selectionScore??"-")}/100 · Sabit pazar: ${safe(m.fixedMarketCount??0)}/6<br>Kaynak: ${safe(m.scoreSource||"Belirtilmedi")} · Detay için dokun</div></article>`).join("")}</div>`).join(""):'<div class="empty">Bu filtreye uygun sistem tahmini bulunamadı.</div>';}
-function render(){const search=$("search").value.toLocaleLowerCase("tr"),league=$("league").value;let filtered=allMatches.filter(m=>{const text=[m.home,m.away,m.league,m.country].join(" ").toLocaleLowerCase("tr");return (!search||text.includes(search))&&(!league||m.league===league)&&dateMatches(m)&&(showFinished?finished(m):!finished(m));});filtered=sortMatches(filtered);$("summary").textContent=`${filtered.length} maç gösteriliyor · ${allMatches.length} toplam kayıt`;$("allCount").textContent=filtered.length;$("allMatches").innerHTML=filtered.length?filtered.map(m=>card(m)).join(""):'<div class="empty">Bu filtrede maç bulunamadı.</div>';const analyzed=filtered.filter(m=>getAnalysis(m));const series=analyzed.filter(m=>allSignals(m).some(s=>s.kind==="SERİ")||allSpecial(m).length);const patterns=analyzed.filter(m=>allSignals(m).some(s=>s.kind==="ÖRÜNTÜ"));const special=analyzed.filter(m=>allSpecial(m).length);const ht=analyzed.filter(m=>allSignals(m).some(s=>String(s.rule||"").includes("İY")));renderCategory("cat1","count1",sortMatches(series).sort((a,b)=>matchSignalCount(b)-matchSignalCount(a)||maxLength(b,"SERİ")-maxLength(a,"SERİ")),"Bu filtrede seri bulunamadı.");renderCategory("cat2","count2",sortMatches(patterns).sort((a,b)=>matchSignalCount(b)-matchSignalCount(a)||maxLength(b,"ÖRÜNTÜ")-maxLength(a,"ÖRÜNTÜ")),"Bu filtrede örüntü bulunamadı.");renderCategory("cat3","count3",sortMatches(special),"Bu filtrede 6+ özel seri bulunamadı.");renderCategory("cat4","count4",sortMatches(ht),"Bu filtrede ilk yarı sinyali bulunamadı.");$("statMatches").textContent=allMatches.length;$("statUpcoming").textContent=allMatches.filter(m=>!finished(m)).length;$("statSignals").textContent=analysisMatches.length;$("statSpecial").textContent=analysisMatches.reduce((n,m)=>n+(m.specialSeries||[]).length,0);renderSystemPredictions();}
-async function loadData(){$("summary").textContent="Bülten ve analiz dosyaları yükleniyor...";try{const [br,ar]=await Promise.all([fetch("./bulten.json?v="+Date.now(),{cache:"no-store"}),fetch("./analiz.json?v="+Date.now(),{cache:"no-store"})]);if(!br.ok)throw new Error("Bülten yüklenemedi: "+br.status);if(!ar.ok)throw new Error("Analiz dosyası henüz bulunamadı: "+ar.status);const bulletin=await br.json(),analysis=await ar.json();if(!Array.isArray(bulletin))throw new Error("bulten.json liste formatında değil.");if(!analysis||!Array.isArray(analysis.matches))throw new Error("analiz.json formatı geçersiz.");allMatches=bulletin;analysisMatches=analysis.matches;analysisById=new Map(analysisMatches.map(m=>[String(m.id),m]));systemPredictions=analysis.systemPredictions||null;const leagues=[...new Set(allMatches.map(m=>m.league).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"tr"));const previous=$("league").value;$("league").innerHTML='<option value="">Tüm Ligler</option>'+leagues.map(n=>`<option value="${safe(n)}">${safe(n)}</option>`).join("");if(leagues.includes(previous))$("league").value=previous;$("updated").textContent="Analiz üretim zamanı: "+(analysis.generatedAt?dateText(analysis.generatedAt):"Bilinmiyor");render();}catch(error){$("summary").textContent="Veri yükleme hatası: "+error.message;$("allMatches").innerHTML=`<div class="empty">${safe(error.message)}</div>`;["cat1","cat2","cat3","cat4"].forEach(id=>$(id).innerHTML='<div class="empty">Analiz verileri yüklenemedi.</div>');renderSystemPredictions();}}
-$("search").addEventListener("input",render);$("league").addEventListener("change",render);$("sort").addEventListener("change",render);$("dateFilter").addEventListener("change",render);$("detailScreen").addEventListener("click",e=>{if(e.target===$("detailScreen"))closeDetail();});document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDetail();});loadData();
+function render(){
+ const search=$("search").value.toLocaleLowerCase("tr"),league=$("league").value;
+ let filtered=allMatches.filter(m=>{
+  const text=[m.home,m.away,m.league,m.country].join(" ").toLocaleLowerCase("tr");
+  return (!search||text.includes(search))&&(!league||m.league===league)&&dateMatches(m)&&(showFinished?finished(m):!finished(m));
+ });
+ filtered=sortMatches(filtered);
+ $("summary").textContent=`${filtered.length} maç gösteriliyor · ${allMatches.length} toplam kayıt`;
+ $("allCount").textContent=filtered.length;
+ $("allMatches").innerHTML=filtered.length?filtered.map(m=>card(m)).join(""):'<div class="empty">Bu filtrede maç bulunamadı.</div>';
+
+ const analyzed=filtered.filter(m=>getAnalysis(m));
+ const series=analyzed.filter(m=>allSignals(m).some(s=>s.kind==="SERİ")||allSpecial(m).length);
+ const patterns=analyzed.filter(m=>allSignals(m).some(s=>s.kind==="ÖRÜNTÜ"));
+ const special=analyzed.filter(m=>allSpecial(m).length);
+ const ht=analyzed.filter(m=>allSignals(m).some(s=>String(s.rule||"").includes("İY")));
+
+ // En uzun SERİ ve ÖRÜNTÜ artık kendi kategorilerinde ilk sırada.
+ renderCategory("cat1","count1",categoryRank(series,"SERİ"),"Bu filtrede seri bulunamadı.");
+ renderCategory("cat2","count2",categoryRank(patterns,"ÖRÜNTÜ"),"Bu filtrede örüntü bulunamadı.");
+
+ // Özel seriler de en uzun seri önceliğiyle sıralanır.
+ renderCategory("cat3","count3",categoryRank(special,"SERİ"),"Bu filtrede 6+ özel seri bulunamadı.");
+
+ // İlk yarı sinyallerinin mevcut sıralama mantığı korunur.
+ renderCategory("cat4","count4",sortMatches(ht),"Bu filtrede ilk yarı sinyali bulunamadı.");
+
+ $("statMatches").textContent=allMatches.length;
+ $("statUpcoming").textContent=allMatches.filter(m=>!finished(m)).length;
+ $("statSignals").textContent=analysisMatches.length;
+ $("statSpecial").textContent=analysisMatches.reduce((n,m)=>n+(m.specialSeries||[]).length,0);
+ renderSystemPredictions();
+}
+async function loadData(){
+ $("summary").textContent="Bülten ve analiz dosyaları yükleniyor...";
+ try{
+  const [br,ar]=await Promise.all([
+   fetch("./bulten.json?v="+Date.now(),{cache:"no-store"}),
+   fetch("./analiz.json?v="+Date.now(),{cache:"no-store"})
+  ]);
+  if(!br.ok)throw new Error("Bülten yüklenemedi: "+br.status);
+  if(!ar.ok)throw new Error("Analiz dosyası henüz bulunamadı: "+ar.status);
+  const bulletin=await br.json(),analysis=await ar.json();
+  if(!Array.isArray(bulletin))throw new Error("bulten.json liste formatında değil.");
+  if(!analysis||!Array.isArray(analysis.matches))throw new Error("analiz.json formatı geçersiz.");
+  allMatches=bulletin;
+  analysisMatches=analysis.matches;
+  analysisById=new Map(analysisMatches.map(m=>[String(m.id),m]));
+  systemPredictions=analysis.systemPredictions||null;
+  const leagues=[...new Set(allMatches.map(m=>m.league).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"tr"));
+  const previous=$("league").value;
+  $("league").innerHTML='<option value="">Tüm Ligler</option>'+leagues.map(n=>`<option value="${safe(n)}">${safe(n)}</option>`).join("");
+  if(leagues.includes(previous))$("league").value=previous;
+  $("updated").textContent="Analiz üretim zamanı: "+(analysis.generatedAt?dateText(analysis.generatedAt):"Bilinmiyor");
+  render();
+ }catch(error){
+  $("summary").textContent="Veri yükleme hatası: "+error.message;
+  $("allMatches").innerHTML=`<div class="empty">${safe(error.message)}</div>`;
+  ["cat1","cat2","cat3","cat4"].forEach(id=>$ (id).innerHTML='<div class="empty">Analiz verileri yüklenemedi.</div>');
+  renderSystemPredictions();
+ }
+}
+$("search").addEventListener("input",render);
+$("league").addEventListener("change",render);
+$("sort").addEventListener("change",render);
+$("dateFilter").addEventListener("change",render);
+$("detailScreen").addEventListener("click",e=>{if(e.target===$("detailScreen"))closeDetail();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDetail();});
+loadData();
 </script>
 </body>
 </html>
