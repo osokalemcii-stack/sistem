@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   analiz-kontrol:
@@ -85,3 +85,16 @@ jobs:
           print("Uretim zamani:", data.get("generatedAt"))
           print("Hedef tarih:", system.get("date"))
           PY
+
+      - name: Analiz sonucunu depoya kaydet
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add analiz.json
+
+          if git diff --staged --quiet; then
+            echo "Analiz dosyasinda degisiklik yok."
+          else
+            git commit -m "chore: analiz.json API kullanmadan guncellendi"
+            git push
+          fi
