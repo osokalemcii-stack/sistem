@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -67,7 +66,25 @@ select{min-width:160px}
 .empty{color:#aab9e8;text-align:center;border:1px dashed #4059aa;border-radius:12px;padding:18px;font-size:12px}
 .hidden{display:none!important}
 footer{text-align:center;color:#8193cb;font-size:10px;padding:25px;line-height:1.7}
-@media(max-width:850px){.grid{grid-template-columns:1fr}}
+
+/* GUNLUK SISTEM TAHMINLERI */
+.system-predictions{margin:16px 0;border:1px solid #8c6a29;border-radius:17px;padding:14px;background:linear-gradient(150deg,#302515dd,#111a43 75%);box-shadow:0 0 18px #8c6a2933}
+.system-predictions h2{font-size:15px;margin:2px 0 8px;padding-bottom:10px;border-bottom:1px solid #8c6a29;color:#ffe2a1}
+.system-note{font-size:10px;color:#d7c69c;line-height:1.6;margin:8px 0 12px}
+.system-groups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
+.system-group{border:1px solid #6e542c;border-radius:12px;padding:10px;background:#171b35}
+.system-group h3{font-size:12px;color:#ffe2a1;margin:2px 0 10px}
+.system-pick{border:1px solid #43549b;border-radius:10px;padding:10px;margin:8px 0;background:linear-gradient(145deg,#132454,#0b1740)}
+.system-pick:last-child{margin-bottom:0}
+.system-pick-head{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;font-size:9px;color:#9eb8ef}
+.system-pick-teams{font-size:11px;font-weight:bold;line-height:1.5;margin:7px 0}
+.system-pick-score{font-size:17px;font-weight:bold;color:#ffe2a1;letter-spacing:.4px}
+.system-pick-meta{font-size:9px;color:#aebee9;margin-top:6px;line-height:1.5}
+
+@media(max-width:850px){
+ .grid{grid-template-columns:1fr}
+ .system-groups{grid-template-columns:1fr}
+}
 @media(max-width:560px){
  header{margin:10px;padding:17px}
  h1{font-size:20px}
@@ -115,6 +132,14 @@ footer{text-align:center;color:#8193cb;font-size:10px;padding:25px;line-height:1
   <div class="stat"><strong id="statSpecial">0</strong><span>Özel seri</span></div>
  </section>
 
+ <section class="system-predictions">
+  <h2>🔥 SİSTEM TAHMİNLERİ <span style="font-size:10px;color:#d7c69c;font-weight:normal">(<span id="systemPredictionCount">0</span>/12)</span></h2>
+  <div id="systemPredictionNote" class="system-note">Günlük sistem tahminleri bekleniyor...</div>
+  <div id="systemPredictionGroups" class="system-groups">
+   <div class="empty">Tahmin verileri yükleniyor...</div>
+  </div>
+ </section>
+
  <section class="grid">
   <div class="category">
    <h2>⚡ TÜM SERİ VE ÖRÜNTÜLER (<span id="count1">0</span>)</h2>
@@ -150,6 +175,7 @@ footer{text-align:center;color:#8193cb;font-size:10px;padding:25px;line-height:1
 let allMatches = [];
 let analysisMatches = [];
 let analysisById = new Map();
+let systemPredictions = null;
 let showFinished = false;
 
 function safe(value){
@@ -251,7 +277,6 @@ function historyText(title,items){
   </ul>
  `;
 }
-
 function analysisDetails(match,cardKey){
  const analysis = getAnalysis(match);
  const panelId = `analysis-${cardKey}`;
@@ -440,13 +465,91 @@ function renderCategory(elementId,countId,matches,emptyText){
   : `<div class="empty">${safe(emptyText)}</div>`;
 }
 
+/* GUNLUK SISTEM TAHMINLERINI EKRANA BAS */
+function renderSystemPredictions(){
+ const countElement = document.getElementById("systemPredictionCount");
+ const noteElement = document.getElementById("systemPredictionNote");
+ const groupsElement = document.getElementById("systemPredictionGroups");
+
+ if(!countElement || !noteElement || !groupsElement) return;
+
+ if(!systemPredictions || !Array.isArray(systemPredictions.groups)){
+  countElement.textContent = "0";
+  noteElement.textContent = "Günlük sistem tahmin verisi analiz.json içinde bulunamadı.";
+  groupsElement.innerHTML = '<div class="empty">Sistem tahmini henüz oluşturulmadı.</div>';
+  return;
+ }
+
+ const search = document.getElementById("search").value.toLocaleLowerCase("tr");
+ const league = document.getElementById("league").value;
+
+ const groups = systemPredictions.groups.map(group => ({
+  ...group,
+  matches: (Array.isArray(group.matches) ? group.matches : []).filter(item => {
+   const searchable = [item.home,item.away,item.league,item.country]
+    .join(" ").toLocaleLowerCase("tr");
+
+   if(search && !searchable.includes(search)) return false;
+   if(league && item.league !== league) return false;
+   return true;
+  })
+ })).filter(group => group.matches.length);
+
+ const visibleCount = groups.reduce(
+  (sum,group) => sum + group.matches.length,0
+ );
+
+ countElement.textContent = visibleCount;
+
+ noteElement.textContent =
+  `Tahmin tarihi: ${safe(systemPredictions.date || "Bilinmiyor")} · ` +
+  `${visibleCount} maç gösteriliyor · ` +
+  `${safe(systemPredictions.note || "Seçim puanı gerçek olasılık değildir.")}`;
+
+ if(!visibleCount){
+  groupsElement.innerHTML =
+   '<div class="empty">Bu filtreye uygun sistem tahmini bulunamadı.</div>';
+  return;
+ }
+
+ groupsElement.innerHTML = groups.map(group => `
+  <div class="system-group">
+   <h3>${safe(group.title || ("Grup " + group.group))}</h3>
+   ${group.matches.map(item => `
+    <article class="system-pick">
+     <div class="system-pick-head">
+      <span>${safe(item.country || "")} · ${safe(item.league || "")}</span>
+      <span>${safe(dateText(item.date))}</span>
+     </div>
+
+     <div class="system-pick-teams">
+      ${safe(item.home || "Ev sahibi")} – ${safe(item.away || "Deplasman")}
+     </div>
+
+     <div class="system-pick-score">
+      ${safe(item.halfTimeScore || "-")} / ${safe(item.finalScore || "-")}
+     </div>
+
+     <div class="system-pick-meta">
+      İY / MS birleşik skor · Seçim puanı: ${safe(item.selectionScore ?? "-")}/100
+      · Sabit pazar: ${safe(item.fixedMarketCount ?? 0)}/6
+      <br>Kaynak: ${safe(item.scoreSource || "Belirtilmedi")}
+     </div>
+    </article>
+   `).join("")}
+  </div>
+ `).join("");
+}
+
 function render(){
  const search = document.getElementById("search").value.toLocaleLowerCase("tr");
  const league = document.getElementById("league").value;
  const sort = document.getElementById("sort").value;
 
  let filtered = allMatches.filter(match => {
-  const searchable = [match.home,match.away,match.league,match.country].join(" ").toLocaleLowerCase("tr");
+  const searchable = [match.home,match.away,match.league,match.country]
+   .join(" ").toLocaleLowerCase("tr");
+
   if(search && !searchable.includes(search)) return false;
   if(league && match.league !== league) return false;
   if(!showFinished && finished(match)) return false;
@@ -464,7 +567,9 @@ function render(){
 
  document.getElementById("summary").textContent =
   `${filtered.length} maç gösteriliyor · ${allMatches.length} toplam kayıt`;
+
  document.getElementById("allCount").textContent = filtered.length;
+
  document.getElementById("allMatches").innerHTML = filtered.length
   ? filtered.map(match => card(match,"allMatches")).join("")
   : '<div class="empty">Bu filtrede maç bulunamadı.</div>';
@@ -472,14 +577,20 @@ function render(){
  const analysisFiltered = filtered.filter(match => getAnalysis(match));
  const allSignalMatches = analysisFiltered.filter(match => allSignals(match).length > 0);
  const specialMatches = analysisFiltered.filter(match => allSpecial(match).length > 0);
- const patternMatches = analysisFiltered.filter(match => allSignals(match).some(signal => signal.kind === "ÖRÜNTÜ"));
- const htMatches = analysisFiltered.filter(match => allSignals(match).some(signal => String(signal.rule || "").includes("İY")));
+ const patternMatches = analysisFiltered.filter(match =>
+  allSignals(match).some(signal => signal.kind === "ÖRÜNTÜ")
+ );
+ const htMatches = analysisFiltered.filter(match =>
+  allSignals(match).some(signal => String(signal.rule || "").includes("İY"))
+ );
 
  renderCategory("cat1","count1",allSignalMatches,"Bu filtrede seri veya örüntü sinyali bulunamadı.");
  renderCategory("cat2","count2",specialMatches,"Bu filtrede 6+ özel seri bulunamadı.");
  renderCategory("cat3","count3",patternMatches,"Bu filtrede örüntü sinyali bulunamadı.");
  renderCategory("cat4","count4",htMatches,"Bu filtrede ilk yarı sinyali bulunamadı.");
+
  updateStats();
+ renderSystemPredictions();
 }
 
 async function loadData(){
@@ -504,6 +615,7 @@ async function loadData(){
   allMatches = bulletin;
   analysisMatches = analysis.matches;
   analysisById = new Map(analysisMatches.map(match => [String(match.id),match]));
+  systemPredictions = analysis.systemPredictions || null;
 
   const leagues = [...new Set(allMatches.map(match => match.league).filter(Boolean))]
    .sort((a,b) => a.localeCompare(b,"tr"));
@@ -514,16 +626,21 @@ async function loadData(){
 
   const generatedAt = analysis.generatedAt ? dateText(analysis.generatedAt) : "Bilinmiyor";
   document.getElementById("updated").textContent = "Analiz üretim zamanı: " + generatedAt;
+
   render();
 
  }catch(error){
   summary.textContent = "Veri yükleme hatası: " + error.message;
-  document.getElementById("allMatches").innerHTML = `<div class="empty">${safe(error.message)}</div>`;
+  document.getElementById("allMatches").innerHTML =
+   `<div class="empty">${safe(error.message)}</div>`;
 
-  [["cat1","count1"],["cat2","count2"],["cat3","count3"],["cat4","count4"]].forEach(([elementId,countId]) => {
-   document.getElementById(elementId).innerHTML = '<div class="empty">Analiz verileri yüklenemedi.</div>';
+  [[ "cat1","count1" ],[ "cat2","count2" ],[ "cat3","count3" ],[ "cat4","count4" ]].forEach(([elementId,countId]) => {
+   document.getElementById(elementId).innerHTML =
+    '<div class="empty">Analiz verileri yüklenemedi.</div>';
    document.getElementById(countId).textContent = "0";
   });
+
+  renderSystemPredictions();
  }
 }
 
