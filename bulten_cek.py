@@ -1,787 +1,501 @@
 
 import os
-import re
 import json
 import time
+import unicodedata
 import requests
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # ============================================================
-# TEK / CIFT ANALIZ MOTORU - VERI TOPLAYICI
-# 25 lig | 90 gun ilk yukleme | kota kontrollu devam mekanizmasi
-# KALICI MAC ARSIVI
+# API-FOOTBALL V3 - 25 LIG BULTEN TOPLAYICI
+# Ucretsiz plan icin kota kontrollu
 # ============================================================
 
-BASE_URL = "https://api.sportstatsapi.com/api/v1"
-API_KEY = os.getenv("SPORTSTATS_API_KEY")
+API_KEY = os.getenv("API_FOOTBALL_KEY")
+BASE_URL = "https://v3.football.api-sports.io"
 
 if not API_KEY:
-    raise SystemExit("HATA: SPORTSTATS_API_KEY bulunamadi.")
-
-SESSION = requests.Session()
-SESSION.headers.update({
-    "Authorization": f"Bearer {API_KEY}",
-    "Accept": "application/json"
-})
+    raise SystemExit("HATA: API_FOOTBALL_KEY bulunamadi.")
 
 OUTPUT_FILE = Path("bulten.json")
 ARCHIVE_FILE = Path("bulten_history.json")
 
-TODAY = datetime.now(timezone.utc).date()
-
-BOOTSTRAP_DAYS = 90
-INCREMENTAL_DAYS = 7
+SEASON = 2026
+HISTORY_DAYS = 90
 FUTURE_DAYS = 14
-PAGE_LIMIT = 100
-MAX_PAGES_PER_LEAGUE_PER_RUN = 3
 
-REQUEST_DELAY = 12.5
-MAX_API_CALLS = 45
+MAX_API_CALLS = 90
+REQUEST_DELAY = 6.5
 
-last_request_time = 0.0
 api_call_count = 0
+last_request_time = 0.0
 
+TODAY = datetime.now(timezone.utc).date()
+DATE_FROM = (TODAY - timedelta(days=HISTORY_DAYS)).isoformat()
+DATE_TO = (TODAY + timedelta(days=FUTURE_DAYS)).isoformat()
+
+SESSION = requests.Session()
+SESSION.headers.update({
+    "x-apisports-key": API_KEY
+})
 
 # ============================================================
 # 25 LIG
+# API isimleri farkli olabilecegi icin alternatifler kullanilir.
 # ============================================================
 
 LEAGUES = [
-    {"code":"l7c","country":"Türkiye","league":"Süper Lig","api_name":"Turkey: Super Lig"},
-    {"code":"l79","country":"Türkiye","league":"1. Lig","api_name":"Turkey: 1. Lig"},
-    {"code":"l30","country":"İngiltere","league":"Premier League","api_name":"England: Premier League"},
-    {"code":"l31","country":"İngiltere","league":"Championship","api_name":"England: Championship"},
-    {"code":"l4b","country":"İtalya","league":"Serie A","api_name":"Italy: Serie A"},
-    {"code":"l4a","country":"İtalya","league":"Serie B","api_name":"Italy: Serie B"},
-    {"code":"l6t","country":"İspanya","league":"LaLiga","api_name":"Spain: LaLiga"},
-    {"code":"l6s","country":"İspanya","league":"LaLiga 2","api_name":"Spain: LaLiga2"},
-    {"code":"l19","country":"Belçika","league":"Jupiler Pro League","api_name":"Belgium: Jupiler Pro League"},
-    {"code":"l5u","country":"Portekiz","league":"Liga Portugal","api_name":"Portugal: Liga Portugal"},
-    {"code":"l58","country":"Hollanda","league":"Eredivisie","api_name":"Netherlands: Eredivisie"},
-    {"code":"l3d","country":"Fransa","league":"Ligue 1","api_name":"France: Ligue 1"},
-    {"code":"l3a","country":"Fransa","league":"Ligue 2","api_name":"France: Ligue 2"},
-    {"code":"l3k","country":"Almanya","league":"Bundesliga","api_name":"Germany: Bundesliga"},
-    {"code":"l3g","country":"Almanya","league":"2. Bundesliga","api_name":"Germany: 2. Bundesliga"},
-    {"code":"l3n","country":"Yunanistan","league":"Super League","api_name":"Greece: Super League"},
-    {"code":"l7x","country":"Rusya","league":"Premier League","api_name":"Russia: Premier League"},
-    {"code":"l66","country":"Suudi Arabistan","league":"Saudi Professional League","api_name":"Saudi Arabia: Saudi Professional League"},
-    {"code":"l67","country":"İskoçya","league":"Premiership","api_name":"Scotland: Premiership"},
-    {"code":"l12","country":"Avusturya","league":"Bundesliga","api_name":"Austria: Bundesliga"},
-    {"code":"l13","country":"Azerbaycan","league":"Premier League","api_name":"Azerbaijan: Premier League"},
-    {"code":"l7k","country":"ABD","league":"MLS","api_name":"USA: Mls"},
-    {"code":"l3","country":"Avrupa","league":"Şampiyonlar Ligi","api_name":"Europe: Champions League - League Phase"},
-    {"code":"l4","country":"Avrupa","league":"Avrupa Ligi","api_name":"Europe: Europa League - League Phase"},
-    {"code":"laz","country":"Avrupa","league":"Konferans Ligi","api_name":"Europe: Conference League - League Phase"}
+    {"country": "Turkey", "label_country": "Türkiye", "label": "Süper Lig",
+     "names": ["Süper Lig", "Super Lig"]},
+
+    {"country": "Turkey", "label_country": "Türkiye", "label": "1. Lig",
+     "names": ["1. Lig", "TFF 1. Lig"]},
+
+    {"country": "England", "label_country": "İngiltere", "label": "Premier League",
+     "names": ["Premier League"]},
+
+    {"country": "England", "label_country": "İngiltere", "label": "Championship",
+     "names": ["Championship"]},
+
+    {"country": "Italy", "label_country": "İtalya", "label": "Serie A",
+     "names": ["Serie A"]},
+
+    {"country": "Italy", "label_country": "İtalya", "label": "Serie B",
+     "names": ["Serie B"]},
+
+    {"country": "Spain", "label_country": "İspanya", "label": "LaLiga",
+     "names": ["La Liga", "LaLiga"]},
+
+    {"country": "Spain", "label_country": "İspanya", "label": "LaLiga 2",
+     "names": ["La Liga 2", "LaLiga 2", "Segunda División"]},
+
+    {"country": "Belgium", "label_country": "Belçika", "label": "Pro Lig",
+     "names": ["Jupiler Pro League", "Belgian Pro League", "First Division A"]},
+
+    {"country": "Portugal", "label_country": "Portekiz", "label": "Liga Portugal",
+     "names": ["Primeira Liga", "Liga Portugal"]},
+
+    {"country": "Netherlands", "label_country": "Hollanda", "label": "Eredivisie",
+     "names": ["Eredivisie"]},
+
+    {"country": "France", "label_country": "Fransa", "label": "Ligue 1",
+     "names": ["Ligue 1"]},
+
+    {"country": "France", "label_country": "Fransa", "label": "Ligue 2",
+     "names": ["Ligue 2"]},
+
+    {"country": "Germany", "label_country": "Almanya", "label": "Bundesliga",
+     "names": ["Bundesliga"]},
+
+    {"country": "Germany", "label_country": "Almanya", "label": "2. Bundesliga",
+     "names": ["2. Bundesliga", "2 Bundesliga"]},
+
+    {"country": "Greece", "label_country": "Yunanistan", "label": "Super League",
+     "names": ["Super League 1", "Super League"]},
+
+    {"country": "Russia", "label_country": "Rusya", "label": "Premier League",
+     "names": ["Premier League", "Premier Liga"]},
+
+    {"country": "Saudi Arabia", "label_country": "Suudi Arabistan",
+     "label": "Saudi Pro League",
+     "names": ["Pro League", "Saudi Pro League"]},
+
+    {"country": "Scotland", "label_country": "İskoçya", "label": "Premiership",
+     "names": ["Premiership", "Scottish Premiership"]},
+
+    {"country": "Austria", "label_country": "Avusturya", "label": "Bundesliga",
+     "names": ["Bundesliga"]},
+
+    {"country": "Azerbaijan", "label_country": "Azerbaycan",
+     "label": "Premier League",
+     "names": ["Premier League"]},
+
+    {"country": "USA", "label_country": "ABD", "label": "MLS",
+     "names": ["Major League Soccer", "MLS"]},
+
+    {"country": "World", "label_country": "Avrupa",
+     "label": "Şampiyonlar Ligi",
+     "names": ["UEFA Champions League"]},
+
+    {"country": "World", "label_country": "Avrupa",
+     "label": "Avrupa Ligi",
+     "names": ["UEFA Europa League"]},
+
+    {"country": "World", "label_country": "Avrupa",
+     "label": "Konferans Ligi",
+     "names": ["UEFA Conference League"]}
 ]
 
 
 # ============================================================
-# GENEL YARDIMCILAR
+# YARDIMCILAR
 # ============================================================
 
 def log(message):
     print(message, flush=True)
 
 
-def normalize_name(value):
-    return re.sub(r"\s+", " ", str(value or "").strip().casefold())
+def normalize(value):
+    value = str(value or "").casefold().strip()
+    value = unicodedata.normalize("NFKD", value)
+    value = "".join(c for c in value if not unicodedata.combining(c))
+    return " ".join(value.split())
 
 
-def parse_score(value):
-    if value is None or value == "":
-        return None
-
-    found = re.search(r"(\d+)\s*[-:]\s*(\d+)", str(value))
-
-    if not found:
-        return None
-
-    return {
-        "home": int(found.group(1)),
-        "away": int(found.group(2))
-    }
-
-
-def team_name(team):
-    if not isinstance(team, dict):
-        return ""
-
-    return team.get("display_name") or team.get("name") or ""
-
-
-def referee_name(match):
-    value = match.get("referee") or ""
-
-    if isinstance(value, dict):
-        return value.get("name") or ""
-
-    return str(value).strip()
-
-
-def get_full_score(match):
-    score = parse_score(match.get("full_time_score"))
-
-    if score:
-        return score
-
-    home = match.get("home_team") or {}
-    away = match.get("away_team") or {}
-
-    h = home.get("score")
-    a = away.get("score")
-
-    if h is not None and a is not None:
-        return {
-            "home": int(h),
-            "away": int(a)
-        }
-
-    return None
-
-
-def get_half_score(match):
-    return parse_score(match.get("half_time_score"))
-
-
-def get_status_code(match):
-    return str(match.get("status_code") or "").strip().lower()
-
-
-def is_finished(match):
-    code = get_status_code(match)
-    status = str(match.get("status") or "").strip().lower()
-
-    finished = {
-        "final",
-        "finished",
-        "after_extra_time",
-        "after_penalties",
-        "ft",
-        "aet",
-        "pen",
-        "completed"
-    }
-
-    return code in finished or status in finished
-
-
-def match_date(match):
-    return (
-        match.get("start_at")
-        or match.get("start_date")
-        or match.get("date")
-        or ""
-    )
-
-
-def match_id(match, league, home, away, date):
-    value = (
-        match.get("match_id")
-        or match.get("id")
-        or match.get("code")
-    )
-
-    if value:
-        return str(value)
-
-    return (
-        f"{league['code']}-{date}-"
-        f"{normalize_name(home)}-{normalize_name(away)}"
-    )
-
-
-def safe_json_load(path, default):
-    if not path.exists():
-        return default
-
-    try:
-        with path.open("r", encoding="utf-8") as file:
-            return json.load(file)
-
-    except Exception as error:
-        log(f"UYARI: {path} okunamadi: {error}")
-        return default
-
-
-def save_json(path, data):
-    temp = path.with_suffix(path.suffix + ".tmp")
-
-    with temp.open("w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
-
-    temp.replace(path)
-
-
-# ============================================================
-# API ERISIMI
-# ============================================================
-
-class DailyQuotaReached(Exception):
-    pass
-
-
-class FatalAPIError(Exception):
-    pass
-
-
-def api_get(path, params):
-    global last_request_time
-    global api_call_count
+def api_get(endpoint, params=None):
+    global api_call_count, last_request_time
 
     if api_call_count >= MAX_API_CALLS:
-        raise DailyQuotaReached(
-            f"Bu calistirmadaki guvenlik siniri "
-            f"({MAX_API_CALLS} istek) doldu."
+        raise RuntimeError(
+            f"Güvenlik kotası doldu: {MAX_API_CALLS} istek."
         )
 
     elapsed = time.time() - last_request_time
 
     if last_request_time and elapsed < REQUEST_DELAY:
-        wait = REQUEST_DELAY - elapsed
-        log(f"API hiz siniri: {wait:.1f} saniye bekleniyor.")
-        time.sleep(wait)
+        time.sleep(REQUEST_DELAY - elapsed)
 
     response = SESSION.get(
-        BASE_URL + path,
-        params=params,
-        timeout=(10, 35)
+        BASE_URL + endpoint,
+        params=params or {},
+        timeout=35
     )
 
     last_request_time = time.time()
     api_call_count += 1
 
     if response.status_code in (401, 403):
-        raise FatalAPIError(
-            f"API yetkilendirme hatasi (HTTP {response.status_code}). "
-            "API anahtari veya hesap yetkisi kontrol edilmeli. "
-            "Ek istek gonderilmeyecek."
+        raise RuntimeError(
+            f"API anahtarı/yetki hatası: HTTP {response.status_code}"
         )
 
     if response.status_code == 429:
-        retry_after = response.headers.get("Retry-After", "")
+        raise RuntimeError("API hız veya günlük kota sınırına ulaşıldı.")
 
-        try:
-            wait_seconds = int(retry_after)
-        except (ValueError, TypeError):
-            wait_seconds = 0
+    response.raise_for_status()
 
-        if wait_seconds > 120:
-            raise DailyQuotaReached(
-                f"API kota bekleme suresi {wait_seconds} saniye. "
-                "Uzun bekleme yapilmadi; ilerleme kaydedilecek."
-            )
+    data = response.json()
 
-        raise DailyQuotaReached(
-            "API 429 yaniti verdi. Hiz veya kota siniri; "
-            "ilerleme kaydedilecek."
+    if data.get("errors"):
+        raise RuntimeError(
+            "API hata döndürdü: " + str(data["errors"])
         )
 
-    if response.status_code >= 400:
-        raise FatalAPIError(
-            f"API HTTP hatasi verdi (HTTP {response.status_code}). "
-            "Ek istek gonderilmeyecek."
-        )
-
-    try:
-        payload = response.json()
-    except ValueError as error:
-        raise FatalAPIError(
-            f"API JSON yaniti okunamadi: {error}. "
-            "Ek istek gonderilmeyecek."
-        )
-
-    if not isinstance(payload, dict) or not payload.get("success"):
-        message = (
-            payload.get("message")
-            or payload.get("error")
-            or "API success alanini true dondurmedi."
-            if isinstance(payload, dict)
-            else "API beklenmeyen yanit bicimi dondurdu."
-        )
-        raise FatalAPIError(
-            f"API basarisiz yanit verdi: {message} "
-            "Ek istek gonderilmeyecek."
-        )
-
-    return payload
+    return data
 
 
-# ============================================================
-# ARSIVI VE DEVAM DURUMUNU YUKLE
-# ============================================================
-
-archive_data = safe_json_load(ARCHIVE_FILE, {})
-
-if not isinstance(archive_data, dict):
-    archive_data = {}
-
-archived_matches = archive_data.get("matches", [])
-old_bulletin = safe_json_load(OUTPUT_FILE, [])
-
-if not archived_matches and isinstance(old_bulletin, list):
-    archived_matches = old_bulletin
-
-archive = {}
-
-for item in archived_matches:
-    if isinstance(item, dict) and item.get("id"):
-        archive[str(item["id"])] = item
+def parse_score(home, away):
+    if home is None or away is None:
+        return ""
+    return f"{home}-{away}"
 
 
-state = archive_data.get("collectorState")
-
-if not isinstance(state, dict):
-    state = {}
-
-
-if not state.get("cycleDateFrom") or not state.get("cycleDateTo"):
-    state = {
-        "bootstrapComplete": False,
-        "cycleMode": "bootstrap",
-        "cycleDateFrom": (
-            TODAY - timedelta(days=BOOTSTRAP_DAYS)
-        ).isoformat(),
-        "cycleDateTo": (
-            TODAY + timedelta(days=FUTURE_DAYS)
-        ).isoformat(),
-        "completedLeagues": [],
-        "nextOffsets": {},
-        "failedLeagues": []
+def is_finished(status):
+    return str(status or "").upper() in {
+        "FT", "AET", "PEN"
     }
 
 
-if (
-    state.get("bootstrapComplete")
-    and len(state.get("completedLeagues", [])) == len(LEAGUES)
-):
-    state.update({
-        "cycleMode": "incremental",
-        "cycleDateFrom": (
-            TODAY - timedelta(days=INCREMENTAL_DAYS)
-        ).isoformat(),
-        "cycleDateTo": (
-            TODAY + timedelta(days=FUTURE_DAYS)
-        ).isoformat(),
-        "completedLeagues": [],
-        "nextOffsets": {},
-        "failedLeagues": []
-    })
+# ============================================================
+# LIG LISTESINI BUL
+# ============================================================
+
+def find_league(all_leagues, config):
+    expected_names = {
+        normalize(x) for x in config["names"]
+    }
+    expected_country = normalize(config["country"])
+
+    candidates = []
+
+    for item in all_leagues:
+        league = item.get("league") or {}
+        country = item.get("country") or {}
+
+        if normalize(country.get("name")) != expected_country:
+            continue
+
+        name = normalize(league.get("name"))
+
+        if name in expected_names:
+            candidates.append(item)
+
+    if not candidates:
+        return None
+
+    # Önce 2026 sezonu bulunan kaydı seç.
+    for item in candidates:
+        seasons = item.get("seasons") or []
+        for season in seasons:
+            if int(season.get("year") or 0) == SEASON:
+                return item
+
+    return candidates[0]
 
 
-if (
-    state.get("bootstrapComplete")
-    and state.get("cycleMode") != "incremental"
-):
-    state.update({
-        "cycleMode": "incremental",
-        "cycleDateFrom": (
-            TODAY - timedelta(days=INCREMENTAL_DAYS)
-        ).isoformat(),
-        "cycleDateTo": (
-            TODAY + timedelta(days=FUTURE_DAYS)
-        ).isoformat(),
-        "completedLeagues": [],
-        "nextOffsets": {},
-        "failedLeagues": []
-    })
+log("=" * 60)
+log("API-FOOTBALL BULTEN TOPLAMA BASLADI")
+log(f"Sezon: {SEASON}")
+log(f"Tarih araligi: {DATE_FROM} - {DATE_TO}")
+log("=" * 60)
 
-
-date_from = state["cycleDateFrom"]
-date_to = state["cycleDateTo"]
-
-mode = (
-    "ILK YUKLEME / DEVAM"
-    if not state.get("bootstrapComplete")
-    else "GUNLUK GUNCELLEME"
+# Tek istekle 2026 sezonunun lig listesini al.
+league_payload = api_get(
+    "/leagues",
+    {"season": SEASON}
 )
 
+all_leagues = league_payload.get("response") or []
 
-def persist_archive():
-    save_json(
-        ARCHIVE_FILE,
-        {
-            "updatedAt": datetime.now(timezone.utc).isoformat(),
-            "collectorState": state,
-            "matches": list(archive.values())
-        }
-    )
-
-
-log("=" * 64)
-log("FUTBOL VERISI TOPLAMA BASLADI")
-log(f"Mod: {mode}")
-log(f"Tarih araligi: {date_from} - {date_to}")
-log(f"Arsivdeki mac: {len(archive)}")
-log(
-    f"Tamamlanan lig: "
-    f"{len(state.get('completedLeagues', []))}/{len(LEAGUES)}"
-)
-log("=" * 64)
+if not all_leagues:
+    raise SystemExit("API lig listesi bos dondu.")
 
 
 # ============================================================
-# LIGLERI KALDIGI YERDEN TARA
+# HER LIG ICIN MACLARI CEK
 # ============================================================
 
-completed = set(state.get("completedLeagues", []))
-offsets = state.setdefault("nextOffsets", {})
-
+all_matches = []
 league_errors = []
 successful_leagues = 0
-new_count = 0
-quota_error = None
 
+for index, config in enumerate(LEAGUES, start=1):
+    label = config["label"]
 
-for league_index, league in enumerate(LEAGUES, start=1):
+    log(f"\n[{index}/{len(LEAGUES)}] {config['label_country']} - {label}")
 
-    code = league["code"]
+    league_item = find_league(all_leagues, config)
 
-    if code in completed:
+    # Sezon listesinde bulunamazsa arama ile tekrar dene.
+    if not league_item:
+        search_name = config["names"][0]
+
+        try:
+            search_payload = api_get(
+                "/leagues",
+                {
+                    "search": search_name,
+                    "country": config["country"]
+                }
+            )
+
+            league_item = find_league(
+                search_payload.get("response") or [],
+                config
+            )
+
+        except Exception as error:
+            league_errors.append(f"{label}: {error}")
+            log(f"  LIG ARAMA HATASI: {error}")
+            continue
+
+    if not league_item:
+        league_errors.append(f"{label}: API lig listesinde bulunamadi.")
+        log("  LIG BULUNAMADI - atlandi.")
         continue
 
-    offset = int(offsets.get(code, 0))
-    pages_this_run = 0
-    league_added = 0
+    league_info = league_item.get("league") or {}
+    league_id = league_info.get("id")
 
-    log(
-        f"\n[{league_index}/{len(LEAGUES)}] "
-        f"{league['country']} - {league['league']} "
-        f"| offset={offset}"
+    seasons = league_item.get("seasons") or []
+    season_years = [
+        int(s.get("year"))
+        for s in seasons
+        if s.get("year") is not None
+    ]
+
+    selected_season = (
+        SEASON if SEASON in season_years
+        else max(season_years) if season_years
+        else SEASON
     )
 
     try:
+        payload = api_get(
+            "/fixtures",
+            {
+                "league": league_id,
+                "season": selected_season,
+                "from": DATE_FROM,
+                "to": DATE_TO,
+                "timezone": "Europe/Istanbul"
+            }
+        )
 
-        while pages_this_run < MAX_PAGES_PER_LEAGUE_PER_RUN:
+        fixtures = payload.get("response") or []
 
-            params = {
-                "league_name": league["api_name"],
-                "date_from": date_from,
-                "date_to": date_to,
-                "limit": PAGE_LIMIT,
-                "offset": offset,
-                "order": "asc"
+        for raw in fixtures:
+            fixture = raw.get("fixture") or {}
+            teams = raw.get("teams") or {}
+            goals = raw.get("goals") or {}
+            score = raw.get("score") or {}
+            halftime = score.get("halftime") or {}
+
+            home = teams.get("home") or {}
+            away = teams.get("away") or {}
+
+            home_name = home.get("name") or ""
+            away_name = away.get("name") or ""
+
+            if not home_name or not away_name:
+                continue
+
+            status = fixture.get("status") or {}
+            referee = fixture.get("referee") or ""
+
+            item = {
+                "id": str(fixture.get("id")),
+                "country": config["label_country"],
+                "league": label,
+                "leagueCode": str(league_id),
+                "date": fixture.get("date") or "",
+                "home": home_name,
+                "away": away_name,
+                "referee": referee,
+                "status": status.get("long") or "",
+                "statusCode": status.get("short") or "",
+                "finalScore": parse_score(
+                    goals.get("home"),
+                    goals.get("away")
+                ),
+                "halfTimeScore": parse_score(
+                    halftime.get("home"),
+                    halftime.get("away")
+                )
             }
 
-            payload = api_get(
-                "/soccer/matches",
-                params
-            )
-
-            page = payload.get("data") or []
-
-            for raw in page:
-
-                api_code = str(raw.get("league_code") or "")
-
-                if api_code and api_code != code:
-                    continue
-
-                home = team_name(raw.get("home_team"))
-                away = team_name(raw.get("away_team"))
-
-                if not home or not away:
-                    continue
-
-                date = match_date(raw)
-
-                item_id = match_id(
-                    raw,
-                    league,
-                    home,
-                    away,
-                    date
-                )
-
-                full = get_full_score(raw)
-                half = get_half_score(raw)
-
-                item = {
-                    "id": item_id,
-                    "country": league["country"],
-                    "league": league["league"],
-                    "leagueCode": code,
-                    "date": date,
-                    "home": home,
-                    "away": away,
-                    "referee": referee_name(raw),
-                    "status": raw.get("status") or "",
-                    "statusCode": get_status_code(raw),
-                    "finalScore": (
-                        f"{full['home']}-{full['away']}"
-                        if full else ""
-                    ),
-                    "halfTimeScore": (
-                        f"{half['home']}-{half['away']}"
-                        if half else ""
-                    )
-                }
-
-                if item_id not in archive:
-                    new_count += 1
-
-                archive[item_id] = item
-                league_added += 1
-
-            pages_this_run += 1
-
-            log(
-                f"  Sayfa {offset // PAGE_LIMIT + 1}: "
-                f"{len(page)} mac"
-            )
-
-            meta = payload.get("meta") or {}
-            total = meta.get("total")
-
-            if not page:
-                offsets.pop(code, None)
-                completed.add(code)
-                state["completedLeagues"] = sorted(completed)
-                persist_archive()
-                break
-
-            next_offset = offset + len(page)
-
-            if total is not None and next_offset >= int(total):
-                offsets.pop(code, None)
-                completed.add(code)
-                state["completedLeagues"] = sorted(completed)
-                persist_archive()
-                break
-
-            if total is None and len(page) < PAGE_LIMIT:
-                offsets.pop(code, None)
-                completed.add(code)
-                state["completedLeagues"] = sorted(completed)
-                persist_archive()
-                break
-
-            offset = next_offset
-            offsets[code] = offset
-            persist_archive()
-
-        if code not in completed:
-            log(
-                f"  Devam konumu kaydedildi: "
-                f"sonraki offset {offset}"
-            )
+            all_matches.append(item)
 
         successful_leagues += 1
-
-        log(
-            f"  Bu calismada islenen kayit: "
-            f"{league_added}"
-        )
-
-    except DailyQuotaReached as error:
-
-        quota_error = str(error)
-        log(f"\nKOTA/HIZ SINIRI: {quota_error}")
-        persist_archive()
-        break
-
-    except FatalAPIError as error:
-
-        quota_error = str(error)
-        log(f"\nKRITIK API HATASI: {quota_error}")
-        persist_archive()
-        break
-
-    except requests.RequestException as error:
-
-        quota_error = (
-            f"Ag/HTTP baglanti hatasi: {error}. "
-            "Ek API istegi gonderilmedi."
-        )
-        log(f"\nBAGLANTI HATASI: {quota_error}")
-        persist_archive()
-        break
+        log(f"  API ligi: {league_info.get('name')}")
+        log(f"  Mac sayisi: {len(fixtures)}")
 
     except Exception as error:
-
-        league_errors.append(
-            f"{league['league']}: {error}"
-        )
-
-        state.setdefault("failedLeagues", []).append({
-            "league": code,
-            "error": str(error),
-            "time": datetime.now(timezone.utc).isoformat()
-        })
-
-        log(f"  LIG HATASI: {error}")
-        persist_archive()
-        continue
+        league_errors.append(f"{label}: {error}")
+        log(f"  MAC CEKME HATASI: {error}")
 
 
 # ============================================================
-# ILK YUKLEME TAMAMLANDI MI?
+# VERI KONTROLU
 # ============================================================
 
-if len(completed) == len(LEAGUES):
+if successful_leagues == 0:
+    raise SystemExit(
+        "HICBIR LIG CEKILEMEDI. Mevcut bulten korunuyor."
+    )
 
-    if not state.get("bootstrapComplete"):
-        state["bootstrapComplete"] = True
-        log("\n90 gunluk ilk yukleme 25 lig icin tamamlandi.")
+# Aynı maçın iki kez yazılmasını engelle.
+unique = {}
 
-    state.update({
-        "cycleMode": "incremental",
-        "cycleDateFrom": (
-            TODAY - timedelta(days=INCREMENTAL_DAYS)
-        ).isoformat(),
-        "cycleDateTo": (
-            TODAY + timedelta(days=FUTURE_DAYS)
-        ).isoformat(),
-        "completedLeagues": [],
-        "nextOffsets": {},
-        "failedLeagues": []
-    })
+for match in all_matches:
+    if match.get("id") and match["id"] != "None":
+        unique[match["id"]] = match
 
+all_matches = list(unique.values())
 
-persist_archive()
-
-
-# ============================================================
-# KALICI ARSIVDEN GECMISI OLUSTUR
-# ============================================================
-
-# Arsivden tarih sinirina gore kayit silinmez.
-# Tarihi eksik veya farkli formatta olan maclar da korunur.
-all_matches = sorted(
-    archive.values(),
+all_matches.sort(
     key=lambda x: x.get("date") or ""
 )
 
 
+# ============================================================
+# TAKIM VE HAKEM GECMISLERINI OLUSTUR
+# ============================================================
+
 team_history = {}
 referee_history = {}
-
-
-def history_item(match, team_key=None):
-
-    ht = parse_score(match.get("halfTimeScore"))
-    ft = parse_score(match.get("finalScore"))
-
-    if not ht or not ft:
-        return None
-
-    home_key = normalize_name(match.get("home"))
-    away_key = normalize_name(match.get("away"))
-
-    if team_key == home_key:
-
-        goals_ht = ht["home"]
-        against_ht = ht["away"]
-        goals_ft = ft["home"]
-        against_ft = ft["away"]
-
-    elif team_key == away_key:
-
-        goals_ht = ht["away"]
-        against_ht = ht["home"]
-        goals_ft = ft["away"]
-        against_ft = ft["home"]
-
-    else:
-
-        goals_ht = None
-        against_ht = None
-        goals_ft = None
-        against_ft = None
-
-    return {
-        "date": match.get("date"),
-        "home": match.get("home"),
-        "away": match.get("away"),
-        "halfTimeScore": (
-            f"{ht['home']}-{ht['away']}"
-        ),
-        "finalScore": (
-            f"{ft['home']}-{ft['away']}"
-        ),
-        "teamGoalsHT": goals_ht,
-        "opponentGoalsHT": against_ht,
-        "teamGoalsFT": goals_ft,
-        "opponentGoalsFT": against_ft,
-        "league": match.get("league"),
-        "referee": match.get("referee")
-    }
-
-
-for match in all_matches:
-
-    home_key = normalize_name(match.get("home"))
-    away_key = normalize_name(match.get("away"))
-    ref_key = normalize_name(match.get("referee"))
-
-    # Tum gecmis korunur; 12 maclik kesme uygulanmaz.
-    match["homeMatches"] = (
-        team_history.get(home_key, [])[::-1]
-    )
-
-    match["awayMatches"] = (
-        team_history.get(away_key, [])[::-1]
-    )
-
-    match["refMatches"] = (
-        referee_history.get(ref_key, [])[::-1]
-    )
-
-    if not is_finished(match):
-        continue
-
-    if not match.get("finalScore") or not match.get("halfTimeScore"):
-        continue
-
-    home_item = history_item(match, home_key)
-    away_item = history_item(match, away_key)
-    ref_item = history_item(match)
-
-    if home_item:
-        team_history.setdefault(
-            home_key, []
-        ).append(home_item)
-
-    if away_item:
-        team_history.setdefault(
-            away_key, []
-        ).append(away_item)
-
-    if ref_key and ref_item:
-        referee_history.setdefault(
-            ref_key, []
-        ).append(ref_item)
-
-
-# ============================================================
-# BULTEN VE ARSIV DOSYALARINI YAZ
-# ============================================================
 
 output = []
 
 for match in all_matches:
+    home_name = match["home"]
+    away_name = match["away"]
 
-    output.append({
-        "id": match.get("id"),
-        "country": match.get("country"),
-        "league": match.get("league"),
+    home_key = normalize(home_name)
+    away_key = normalize(away_name)
+    referee_key = normalize(match.get("referee"))
+
+    # Analiz motoru en yeniden eskiye sıralı geçmiş bekliyor.
+    match["homeMatches"] = list(
+        reversed(team_history.get(home_key, []))
+    )
+    match["awayMatches"] = list(
+        reversed(team_history.get(away_key, []))
+    )
+    match["refMatches"] = list(
+        reversed(referee_history.get(referee_key, []))
+    ) if referee_key else []
+
+    output.append(match)
+
+    if not is_finished(match.get("statusCode")):
+        continue
+
+    final_score = match.get("finalScore")
+    half_score = match.get("halfTimeScore")
+
+    if not final_score or not half_score:
+        continue
+
+    try:
+        fh, fa = [int(x) for x in final_score.split("-")]
+        hh, ha = [int(x) for x in half_score.split("-")]
+    except (ValueError, TypeError):
+        continue
+
+    common = {
         "date": match.get("date"),
-        "home": match.get("home"),
-        "away": match.get("away"),
-        "referee": match.get("referee"),
-        "status": match.get("status"),
-        "statusCode": match.get("statusCode"),
-        "finalScore": match.get("finalScore"),
-        "halfTimeScore": match.get("halfTimeScore"),
-        "homeMatches": match.get("homeMatches", []),
-        "awayMatches": match.get("awayMatches", []),
-        "refMatches": match.get("refMatches", [])
-    })
+        "home": home_name,
+        "away": away_name,
+        "halfTimeScore": half_score,
+        "finalScore": final_score,
+        "league": match.get("league"),
+        "referee": match.get("referee")
+    }
+
+    home_item = {
+        **common,
+        "teamGoalsHT": hh,
+        "opponentGoalsHT": ha,
+        "teamGoalsFT": fh,
+        "opponentGoalsFT": fa
+    }
+
+    away_item = {
+        **common,
+        "teamGoalsHT": ha,
+        "opponentGoalsHT": hh,
+        "teamGoalsFT": fa,
+        "opponentGoalsFT": fh
+    }
+
+    team_history.setdefault(home_key, []).append(home_item)
+    team_history.setdefault(away_key, []).append(away_item)
+
+    if referee_key:
+        referee_history.setdefault(
+            referee_key, []
+        ).append(common)
 
 
-save_json(OUTPUT_FILE, output)
-persist_archive()
+# ============================================================
+# DOSYALARI KAYDET
+# ============================================================
+
+with OUTPUT_FILE.open("w", encoding="utf-8") as file:
+    json.dump(output, file, ensure_ascii=False, indent=2)
+
+archive_data = {
+    "updatedAt": datetime.now(timezone.utc).isoformat(),
+    "source": "API-FOOTBALL",
+    "season": SEASON,
+    "matches": output
+}
+
+with ARCHIVE_FILE.open("w", encoding="utf-8") as file:
+    json.dump(archive_data, file, ensure_ascii=False, indent=2)
 
 
 # ============================================================
@@ -789,60 +503,32 @@ persist_archive()
 # ============================================================
 
 finished_count = sum(
-    1 for m in all_matches if is_finished(m)
+    1 for m in output if is_finished(m.get("statusCode"))
 )
 
-ht_count = sum(
-    1 for m in all_matches if m.get("halfTimeScore")
-)
-
-ft_count = sum(
-    1 for m in all_matches if m.get("finalScore")
-)
-
-ref_count = sum(
-    1 for m in all_matches if m.get("referee")
-)
-
-team_history_count = sum(
+upcoming_count = sum(
     1 for m in output
-    if m["homeMatches"] or m["awayMatches"]
+    if not is_finished(m.get("statusCode"))
 )
 
-ref_history_count = sum(
-    1 for m in output if m["refMatches"]
-)
+ht_count = sum(1 for m in output if m.get("halfTimeScore"))
+ft_count = sum(1 for m in output if m.get("finalScore"))
 
-league_count = len(
-    set(m.get("league") for m in all_matches if m.get("league"))
-)
-
-
-log("\n" + "=" * 64)
-log("VERI TOPLAMA RAPORU")
-log(f"Mod: {mode}")
-log(
-    f"Bu calismadaki API istegi: "
-    f"{api_call_count}/{MAX_API_CALLS}"
-)
-log(f"Tamamlanan lig: {len(completed)}/{len(LEAGUES)}")
-log(f"Arsivdeki mac: {len(all_matches)}")
-log(f"Bu calismada yeni mac: {new_count}")
-log(f"Arsivde eslesen lig: {league_count}/{len(LEAGUES)}")
+log("\n" + "=" * 60)
+log("BULTEN TOPLAMA RAPORU")
+log(f"Basarili lig: {successful_leagues}/{len(LEAGUES)}")
+log(f"Toplam mac: {len(output)}")
 log(f"Tamamlanan mac: {finished_count}")
+log(f"Gelecek/canli mac: {upcoming_count}")
 log(f"IY skoru bulunan: {ht_count}")
 log(f"MS skoru bulunan: {ft_count}")
-log(f"Hakem bilgisi bulunan: {ref_count}")
-log(f"Takim gecmisi bulunan mac: {team_history_count}")
-log(f"Hakem gecmisi bulunan mac: {ref_history_count}")
-
-if quota_error:
-    log(f"Kota nedeniyle durdu: {quota_error}")
+log(f"API istegi: {api_call_count}/{MAX_API_CALLS}")
 
 if league_errors:
-    log("Hata alinan ligler:")
+    log("\nUYARILAR:")
     for error in league_errors:
         log(" - " + error)
 
-log("Arsiv ve bulten dosyalari kaydedildi.")
-log("=" * 64)
+log("bulten.json kaydedildi.")
+log("bulten_history.json kaydedildi.")
+log("=" * 60)
