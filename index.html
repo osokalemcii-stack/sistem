@@ -3,652 +3,192 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#080d2b">
+<meta name="theme-color" content="#100b25">
 <title>Tek / Çift Analiz Motoru</title>
-
 <style>
 :root{
- --bg:#080d2b;--panel:#101b4b;--panel2:#14245d;--blue:#397cff;
- --purple:#873cff;--cyan:#48baff;--text:#edf2ff;--muted:#9eaddb;
- --line:#3454b8;--green:#38e6a3;--red:#ff648b;--gold:#ffd166;
+ --bg:#090716;--panel:#17102d;--panel2:#21153d;--purple:#985cff;--purple2:#7138d6;
+ --text:#f4efff;--muted:#b6a9d3;--line:#49316f;--green:#43dfad;--red:#ff729c;--gold:#ffd27a;
 }
 *{box-sizing:border-box}
-body{margin:0;color:var(--text);background:radial-gradient(ellipse at top,#172d78 0%,#0b1440 40%,#050922 100%);font-family:Arial,Helvetica,sans-serif;min-height:100vh}
-header{max-width:1450px;margin:24px auto 15px;padding:22px;border:1px solid #5268db;border-radius:19px;background:linear-gradient(135deg,#142b75,#111b50 65%,#26115d);box-shadow:0 0 25px #294bca55,inset 0 0 20px #5268db18}
-h1{font-size:25px;margin:0 0 9px}
-.subtitle{font-size:12px;color:#b9c9ff}
+body{margin:0;color:var(--text);background:radial-gradient(ellipse at top,#30205a 0%,#140e29 42%,#080611 100%);font-family:Arial,Helvetica,sans-serif;min-height:100vh}
+header{max-width:1450px;margin:22px auto 15px;padding:22px;border:1px solid #8054c8;border-radius:19px;background:linear-gradient(135deg,#35205d,#1b1235 65%,#30165b);box-shadow:0 0 28px #7138d644}
+h1{font-size:25px;margin:0 0 9px}.subtitle{font-size:12px;color:#d0c0ef}
 main{max-width:1450px;margin:auto;padding:0 16px 35px}
 .toolbar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:15px 0}
-button{border:1px solid #526cff;background:linear-gradient(135deg,#1748c5,#5630d8);color:white;padding:11px 14px;border-radius:11px;font-weight:bold;font-size:12px;cursor:pointer;box-shadow:0 0 12px #345cff55}
-button:hover{filter:brightness(1.2)}
-button.secondary{background:#111f55}
-input,select{background:#0c1745;color:white;border:1px solid #5268d8;border-radius:10px;padding:12px;font-size:13px;outline:none}
-input{flex:1;min-width:180px}
-select{min-width:160px}
+.toolbar .push{margin-left:auto}
+button,select,input{font:inherit}
+button{border:1px solid #9b70e8;background:linear-gradient(135deg,#7138d6,#9a54ec);color:white;padding:11px 14px;border-radius:11px;font-weight:bold;font-size:12px;cursor:pointer;box-shadow:0 0 12px #7138d633}
+button:hover{filter:brightness(1.14)}button.secondary{background:#24183f;border-color:#62458c}
+input,select{background:#140e29;color:white;border:1px solid #674b91;border-radius:10px;padding:12px;font-size:13px;outline:none}
+input{flex:1;min-width:180px}select{min-width:155px}
 .info{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:11px;margin:12px 2px}
 .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
-.stat{border:1px solid #4059b7;border-radius:13px;padding:13px;background:linear-gradient(145deg,#14265f,#0b1745)}
-.stat strong{display:block;font-size:22px;color:#fff;margin-bottom:5px}
-.stat span{font-size:10px;color:var(--muted)}
+.stat{border:1px solid #513879;border-radius:13px;padding:13px;background:linear-gradient(145deg,#24183f,#130e27)}
+.stat strong{display:block;font-size:22px;color:#fff;margin-bottom:5px}.stat span{font-size:10px;color:var(--muted)}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
-.category{border:1px solid #4664db;border-radius:17px;padding:13px;background:linear-gradient(160deg,#101d52dd,#0b153eea);box-shadow:0 0 17px #3156d955;min-width:0}
-.category h2{font-size:13px;margin:2px 0 13px;padding-bottom:10px;border-bottom:1px solid #4059b7}
-.match{background:linear-gradient(145deg,#10245f,#0b1745);border:1px solid #3456bb;border-radius:13px;padding:13px;margin-bottom:10px;box-shadow:inset 0 0 14px #2447a522}
+.category{border:1px solid #563b80;border-radius:17px;padding:13px;background:linear-gradient(160deg,#1a1234ee,#100b22ee);box-shadow:0 0 17px #6e42a522;min-width:0}
+.category h2{font-size:13px;margin:2px 0 13px;padding-bottom:10px;border-bottom:1px solid #49316f}
+.match{background:linear-gradient(145deg,#21163d,#120d27);border:1px solid #49316f;border-radius:13px;padding:13px;margin-bottom:10px;cursor:pointer;transition:.15s}
+.match:hover,.system-pick:hover{border-color:#a77aff;transform:translateY(-1px);box-shadow:0 0 16px #985cff22}
 .match:last-child{margin-bottom:0}
 .matchhead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:9px}
-.league{font-size:10px;color:#78baff}
-.date{font-size:10px;color:#a9b8e8;text-align:right}
+.league{font-size:10px;color:#c6a9ff}.date{font-size:10px;color:#b6a9d3;text-align:right}
 .teams{display:grid;grid-template-columns:1fr auto 1fr;gap:7px;align-items:center;text-align:center;margin:12px 0}
-.team{font-size:13px;font-weight:bold;overflow-wrap:anywhere}
-.score{font-size:17px;font-weight:bold;color:#fff}
-.status{font-size:10px;color:#a9b8e8;margin-top:4px}
-.details{border-top:1px solid #344b9d;padding-top:9px;margin-top:9px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
-.pill{background:#183d91;color:#b9d8ff;padding:5px 8px;border-radius:20px;font-size:9px}
-.pill.green{background:#125b50;color:#a8ffe1}
-.pill.gold{background:#69501b;color:#ffe4a0}
-.pill.red{background:#67213b;color:#ffc0d0}
-.history{display:none;margin-top:10px;padding-top:8px;border-top:1px solid #344b9d;color:#b5c4ed;font-size:11px;line-height:1.7}
-.history.open{display:block}
-.history ul{padding-left:17px}
-.signal{border:1px solid #3858ae;border-radius:10px;padding:10px;margin:8px 0;background:#0b1740}
-.signal-title{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:7px;font-size:11px;font-weight:bold}
-.signal p{color:#bdcafa;font-size:10px;line-height:1.55;margin:6px 0}
-.sequence{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0}
-.sequence span{padding:5px 8px;border-radius:7px;font-size:9px;font-weight:bold;background:#203d83;color:#dce8ff}
-.sequence span.odd{background:#643c9e}
-.sequence span.even{background:#145b75}
-.expected{color:#ffe2a1;font-size:10px;font-weight:bold}
-.explanation{color:#aebee9;font-size:10px;line-height:1.55;margin-top:6px}
-.special{border:1px solid #8c6a29;background:linear-gradient(145deg,#382c16,#211c20);border-radius:10px;padding:10px;margin:8px 0}
-.special strong{color:#ffe2a1;font-size:11px}
-.special p{font-size:10px;color:#e4d3a8;line-height:1.5;margin:6px 0 0}
-.data-quality{color:#849bd7;font-size:9px;margin-top:9px;line-height:1.6}
-.empty{color:#aab9e8;text-align:center;border:1px dashed #4059aa;border-radius:12px;padding:18px;font-size:12px}
-.hidden{display:none!important}
-footer{text-align:center;color:#8193cb;font-size:10px;padding:25px;line-height:1.7}
-
-/* GUNLUK SISTEM TAHMINLERI */
-.system-predictions{margin:16px 0;border:1px solid #8c6a29;border-radius:17px;padding:14px;background:linear-gradient(150deg,#302515dd,#111a43 75%);box-shadow:0 0 18px #8c6a2933}
+.team{font-size:13px;font-weight:bold;overflow-wrap:anywhere}.score{font-size:17px;font-weight:bold;color:#fff}.status{font-size:10px;color:#b6a9d3;margin-top:4px}
+.details{border-top:1px solid #392750;padding-top:9px;margin-top:9px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.pill{background:#352253;color:#dfceff;padding:5px 8px;border-radius:20px;font-size:9px}.pill.green{background:#125b50;color:#a8ffe1}.pill.gold{background:#69501b;color:#ffe4a0}.pill.red{background:#67213b;color:#ffc0d0}
+.sequence{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0}.sequence span{padding:5px 8px;border-radius:7px;font-size:9px;font-weight:bold;background:#39245e;color:#eadfff}.sequence span.odd{background:#643c9e}.sequence span.even{background:#145b75}
+.empty{color:#c2b4df;text-align:center;border:1px dashed #62458c;border-radius:12px;padding:18px;font-size:12px}
+footer{text-align:center;color:#9483b8;font-size:10px;padding:25px;line-height:1.7}
+.system-predictions{margin:16px 0;border:1px solid #8c6a29;border-radius:17px;padding:14px;background:linear-gradient(150deg,#302515dd,#17102d 75%);box-shadow:0 0 18px #8c6a2922}
 .system-predictions h2{font-size:15px;margin:2px 0 8px;padding-bottom:10px;border-bottom:1px solid #8c6a29;color:#ffe2a1}
 .system-note{font-size:10px;color:#d7c69c;line-height:1.6;margin:8px 0 12px}
 .system-groups{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:start}
-.system-group{border:1px solid #6e542c;border-radius:12px;padding:10px;background:#171b35}
+.system-group{border:1px solid #6e542c;border-radius:12px;padding:10px;background:#1c182b}
 .system-group h3{font-size:12px;color:#ffe2a1;margin:2px 0 10px}
-.system-pick{border:1px solid #43549b;border-radius:10px;padding:10px;margin:8px 0;background:linear-gradient(145deg,#132454,#0b1740)}
-.system-pick:last-child{margin-bottom:0}
-.system-pick-head{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;font-size:9px;color:#9eb8ef}
+.system-pick{border:1px solid #594a79;border-radius:10px;padding:10px;margin:8px 0;background:linear-gradient(145deg,#211b3b,#120f25);cursor:pointer;transition:.15s}
+.system-pick-head{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;font-size:9px;color:#c0b2dc}
 .system-pick-teams{font-size:11px;font-weight:bold;line-height:1.5;margin:7px 0}
 .system-pick-score{font-size:17px;font-weight:bold;color:#ffe2a1;letter-spacing:.4px}
-.system-pick-meta{font-size:9px;color:#aebee9;margin-top:6px;line-height:1.5}
-
-@media(max-width:850px){
- .grid{grid-template-columns:1fr}
- .system-groups{grid-template-columns:1fr}
-}
+.system-pick-meta{font-size:9px;color:#c0b2dc;margin-top:6px;line-height:1.5}
+/* Full-screen match detail */
+.detail-screen{position:fixed;inset:0;z-index:50;background:#090611f5;backdrop-filter:blur(12px);display:none;overflow-y:auto}
+.detail-screen.open{display:block}
+.detail-wrap{max-width:1050px;margin:0 auto;padding:16px}
+.detail-topbar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;padding:10px 0 14px;background:#090611ee;backdrop-filter:blur(10px)}
+.detail-topbar button{flex:0 0 auto}.detail-title{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.detail-hero{border:1px solid #69469a;border-radius:18px;padding:18px;background:linear-gradient(145deg,#2b1b4b,#17102e);box-shadow:0 0 25px #7138d633}
+.detail-league{font-size:11px;color:#c8aaff}.detail-teams{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;text-align:center;margin:20px 0}
+.detail-team{font-size:clamp(17px,3vw,25px);font-weight:bold;overflow-wrap:anywhere}.detail-vs{font-size:18px;color:#d5c4f4}
+.detail-summary{font-size:13px;line-height:1.6;color:#e8ddfb;border-top:1px solid #63478a;padding-top:13px;margin-top:12px}
+.detail-section{border:1px solid #49316f;border-radius:15px;padding:15px;margin-top:13px;background:linear-gradient(145deg,#1c1433,#100b20)}
+.detail-section h3{font-size:13px;margin:0 0 12px;color:#d7bfff}
+.score-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:9px}
+.score-card{border:1px solid #513879;border-radius:11px;padding:12px;text-align:center;background:#17102d}
+.score-card.main{border-color:#288c70}.score-card.alt{border-color:#8c6a29}
+.score-card .score-big{font-size:22px;font-weight:bold;margin:6px 0;color:#fff}.score-card .score-sub{font-size:10px;color:#b6a9d3;line-height:1.5}
+.signal{border:1px solid #49316f;border-radius:10px;padding:11px;margin:8px 0;background:#130e27}
+.signal-title{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:7px;font-size:11px;font-weight:bold}
+.signal p{color:#c8bce0;font-size:11px;line-height:1.55;margin:6px 0}
+.expected{color:#ffe2a1;font-size:11px;font-weight:bold}.explanation{color:#b6a9d3;font-size:11px;line-height:1.55;margin-top:6px}
+.special{border:1px solid #8c6a29;background:linear-gradient(145deg,#382c16,#211c20);border-radius:10px;padding:10px;margin:8px 0}
+.special strong{color:#ffe2a1;font-size:11px}.special p{font-size:10px;color:#e4d3a8;line-height:1.5;margin:6px 0 0}
+.data-quality{color:#a997c9;font-size:10px;margin-top:9px;line-height:1.7}
+.source-row{padding:9px 0;border-top:1px solid #382750}
+details.deep{margin-top:10px;border-top:1px solid #49316f;padding-top:10px}
+details.deep summary{cursor:pointer;color:#cbb3f4;font-size:11px;font-weight:bold}
+.hidden{display:none!important}
+@media(max-width:850px){.grid{grid-template-columns:1fr}.system-groups{grid-template-columns:1fr}}
 @media(max-width:560px){
- header{margin:10px;padding:17px}
- h1{font-size:20px}
- main{padding:0 10px 25px}
- .toolbar>*{width:100%}
- .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
- .teams{gap:4px}
- .team{font-size:12px}
+ header{margin:10px;padding:17px}h1{font-size:20px}main{padding:0 10px 25px}
+ .toolbar>*{width:100%}.toolbar .push{margin-left:0}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .teams{gap:4px}.team{font-size:12px}.detail-wrap{padding:10px}.detail-hero{padding:13px}.detail-teams{gap:6px}
 }
 </style>
 </head>
-
 <body>
 <header>
- <div style="color:#75aaff;font-size:11px;font-weight:bold;letter-spacing:2px">FOOTBALL DATA & ANALYTICS</div>
+ <div style="color:#c4a2ff;font-size:11px;font-weight:bold;letter-spacing:2px">FOOTBALL DATA & ANALYTICS</div>
  <h1>⚽ TEK / ÇİFT ANALİZ MOTORU (25 LİG)</h1>
  <div class="subtitle">12 Kural • 6+ Özel Seri • Otomatik Geçmiş Analizi</div>
 </header>
-
 <main>
  <div class="toolbar">
   <button id="finishedBtn" onclick="toggleFinished()">🏁 Biten Maçları Göster</button>
   <button onclick="loadData()">🔄 Verileri Yenile</button>
+  <select id="dateFilter" class="push" aria-label="Tarih filtresi">
+   <option value="all">Tüm tarihler</option><option value="today">Bugün</option>
+   <option value="tomorrow">Yarın</option><option value="next7">Önümüzdeki 7 gün</option>
+  </select>
  </div>
-
  <div class="toolbar">
   <input id="search" placeholder="Takım veya lig ara...">
   <select id="league"><option value="">Tüm Ligler</option></select>
   <select id="sort">
+   <option value="signals">En çok sinyal önce</option>
    <option value="new">En yakındaki maçlar önce</option>
    <option value="old">En uzaktaki maçlar önce</option>
-   <option value="signals">En çok sinyal önce</option>
   </select>
  </div>
-
- <div class="info">
-  <span id="summary">Veriler yükleniyor...</span>
-  <span id="updated">Güncelleme zamanı bekleniyor</span>
- </div>
-
+ <div class="info"><span id="summary">Veriler yükleniyor...</span><span id="updated">Güncelleme zamanı bekleniyor</span></div>
  <section class="stats">
   <div class="stat"><strong id="statMatches">0</strong><span>Toplam maç</span></div>
   <div class="stat"><strong id="statUpcoming">0</strong><span>Gelecek maç</span></div>
   <div class="stat"><strong id="statSignals">0</strong><span>Sinyalli maç</span></div>
   <div class="stat"><strong id="statSpecial">0</strong><span>Özel seri</span></div>
  </section>
-
  <section class="system-predictions">
-  <h2>🔥 SİSTEM TAHMİNLERİ <span style="font-size:10px;color:#d7c69c;font-weight:normal">(<span id="systemPredictionCount">0</span>/12)</span></h2>
-  <div id="systemPredictionNote" class="system-note">Günlük sistem tahminleri bekleniyor...</div>
-  <div id="systemPredictionGroups" class="system-groups">
-   <div class="empty">Tahmin verileri yükleniyor...</div>
-  </div>
+  <h2>🔥 SİSTEM TAHMİNLERİ <span style="font-size:10px;color:#d7c69c">(<span id="systemPredictionCount">0</span>)</span></h2>
+  <div id="systemPredictionNote" class="system-note">Sistem tahminleri yükleniyor...</div>
+  <div id="systemPredictionGroups" class="system-groups"><div class="empty">Yükleniyor...</div></div>
  </section>
-
  <section class="grid">
   <div class="category">
-   <h2>⚡ TÜM SERİ VE ÖRÜNTÜLER (<span id="count1">0</span>)</h2>
-   <div id="cat1"><div class="empty">Analiz verileri bekleniyor...</div></div>
+   <h2>📈 SERİLER <span class="pill" id="count1">0</span></h2>
+   <div id="cat1"></div>
   </div>
   <div class="category">
-   <h2>🔥 6+ ÖZEL SERİLER (<span id="count2">0</span>)</h2>
-   <div id="cat2"><div class="empty">Analiz verileri bekleniyor...</div></div>
+   <h2>🔁 ÖRÜNTÜLER <span class="pill" id="count2">0</span></h2>
+   <div id="cat2"></div>
   </div>
   <div class="category">
-   <h2>🔁 ÖRÜNTÜ BULUNAN MAÇLAR (<span id="count3">0</span>)</h2>
-   <div id="cat3"><div class="empty">Analiz verileri bekleniyor...</div></div>
+   <h2>🔥 6+ ÖZEL SERİLER <span class="pill" id="count3">0</span></h2>
+   <div id="cat3"></div>
   </div>
   <div class="category">
-   <h2>⏱️ İLK YARI SİNYALLERİ (<span id="count4">0</span>)</h2>
-   <div id="cat4"><div class="empty">Analiz verileri bekleniyor...</div></div>
+   <h2>⏱️ İLK YARI SİNYALLERİ <span class="pill" id="count4">0</span></h2>
+   <div id="cat4"></div>
   </div>
  </section>
-
- <div style="margin-top:16px" class="category">
-  <h2>📋 TÜM MAÇLAR (<span id="allCount">0</span>)</h2>
-  <div id="allMatches"><div class="empty">Bülten yükleniyor...</div></div>
- </div>
+ <section class="category" style="margin-top:14px">
+  <h2>⚽ TÜM MAÇLAR <span class="pill" id="allCount">0</span></h2>
+  <div id="allMatches"></div>
+ </section>
 </main>
-
 <footer>
- Veriler SportStatsAPI üzerinden hazırlanan GitHub bülten dosyalarından okunur.
- <br>
- Seri ve örüntüler geçmiş maç kayıtlarına dayanır; kesin sonuç veya bahis garantisi değildir.
+ Tek / Çift Analiz Motoru · Veriler otomatik güncellenir.<br>
+ Tahminler istatistiksel model çıktısıdır; kesin sonuç veya garanti değildir.
 </footer>
-
+<div id="detailScreen" class="detail-screen" aria-modal="true" role="dialog">
+ <div class="detail-wrap">
+  <div class="detail-topbar">
+   <button class="secondary" onclick="closeDetail()">← Geri</button>
+   <div class="detail-title" id="detailTitle">Maç Analizi</div>
+  </div>
+  <div id="detailContent"></div>
+ </div>
+</div>
 <script>
-let allMatches = [];
-let analysisMatches = [];
-let analysisById = new Map();
-let systemPredictions = null;
-let showFinished = false;
-
-function safe(value){
- return String(value ?? "").replace(/[&<>"']/g, character => ({
-  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
- }[character]));
-}
-
-function finished(match){
- const values = [
-  "ft","aet","pen","finished","final",
-  "after_extra_time","after_penalties","completed"
- ];
- const code = String(match.statusCode || "").toLowerCase();
- const status = String(match.status || "").toLowerCase();
- return values.includes(code) || values.includes(status);
-}
-
-function dateValue(match){
- const date = new Date(match.date || 0);
- return isNaN(date.getTime()) ? 0 : date.getTime();
-}
-
-function dateText(value){
- if(!value) return "Tarih yok";
- const date = new Date(value);
- if(isNaN(date.getTime())) return safe(value);
- return date.toLocaleString("tr-TR",{
-  day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"
- });
-}
-
-function getAnalysis(match){
- return analysisById.get(String(match.id)) || null;
-}
-
-function matchSignalCount(match){
- const analysis = getAnalysis(match);
- return analysis ? Number(analysis.signalCount || 0) : 0;
-}
-
-function allSignals(match){
- const analysis = getAnalysis(match);
- return analysis && Array.isArray(analysis.signals) ? analysis.signals : [];
-}
-
-function allSpecial(match){
- const analysis = getAnalysis(match);
- return analysis && Array.isArray(analysis.specialSeries) ? analysis.specialSeries : [];
-}
-
-function sequenceHTML(sequence){
- if(!Array.isArray(sequence) || !sequence.length) return "";
- return `<div class="sequence">${sequence.map(value =>
-  `<span class="${value === "TEK" ? "odd" : "even"}">${safe(value)}</span>`
- ).join("")}</div>`;
-}
-
-function signalHTML(signal){
- const kind = signal.kind || "SİNYAL";
- const kindClass = kind === "SERİ" ? "green" : "gold";
- return `
-  <div class="signal">
-   <div class="signal-title">
-    <span>${safe(signal.rule || "Kural")}</span>
-    <span class="pill ${kindClass}">${safe(kind)}</span>
-   </div>
-   ${signal.pattern ? `<div class="pill">${safe(signal.pattern)}</div>` : ""}
-   ${sequenceHTML(signal.sequence)}
-   ${signal.length ? `<p>Uzunluk: <b>${safe(signal.length)} maç</b></p>` : ""}
-   ${signal.expected ? `<div class="expected">Seri/örüntü sonrası senaryo: ${safe(signal.expected)}</div>` : ""}
-   <div class="explanation">${safe(signal.explanation || "")}</div>
-  </div>
- `;
-}
-
-function specialHTML(item){
- return `
-  <div class="special">
-   <strong>🔥 ${safe(item.name)} · ${safe(item.length)} MAÇ (${safe(item.side)})</strong>
-   <p>${safe(item.explanation || "")}</p>
-  </div>
- `;
-}
-
-function historyText(title,items){
- if(!Array.isArray(items) || !items.length) return `<p>${safe(title)}: Geçmiş veri bulunamadı.</p>`;
- return `
-  <b>${safe(title)}</b>
-  <ul>
-   ${items.slice(0,8).map(item => {
-    if(typeof item === "string") return `<li>${safe(item)}</li>`;
-    const home = item.home || "";
-    const away = item.away || "";
-    const score = item.finalScore || item.score || "";
-    const half = item.halfTimeScore ? ` (İY ${safe(item.halfTimeScore)})` : "";
-    return `<li>${safe(dateText(item.date))} — ${safe(home)} ${safe(score)} ${safe(away)}${half}</li>`;
-   }).join("")}
-  </ul>
- `;
-}
-function analysisDetails(match,cardKey){
- const analysis = getAnalysis(match);
- const panelId = `analysis-${cardKey}`;
-
- if(!analysis){
-  return `<div class="history" id="${panelId}"><p>Bu maç için henüz analiz verisi bulunamadı.</p></div>`;
- }
-
- const signals = allSignals(match);
- const special = allSpecial(match);
- const expectations = analysis.expectations || {};
- const expectationDetails = analysis.expectationDetails || {};
- const scenarios = Array.isArray(analysis.scoreScenarios) ? analysis.scoreScenarios : [];
- const alternative = analysis.alternativeAnalysis || {};
- const quality = analysis.dataQuality || {};
-
- const expectationRows = Object.entries(expectations).map(([key,value]) => {
-  const detail = expectationDetails[key] || {};
-  const votes = detail.votes || {};
-  const sources = Array.isArray(detail.sources) ? detail.sources : [];
-
-  return `
-   <div class="signal" style="margin-bottom:10px">
-    <div class="signal-title">
-     <b>${safe(key)}</b>
-     <span class="expected">${safe(value)}</span>
-    </div>
-    <div class="data-quality">
-     Ağırlıklı destek — TEK: ${safe(votes.TEK ?? 0)} · ÇİFT: ${safe(votes["ÇİFT"] ?? 0)}
-     · Destekleyen grup: ${safe(detail.supportCount ?? 0)}
-     ${detail.conflict ? " · Kaynaklar çelişiyor" : ""}
-    </div>
-    ${sources.length ? sources.map(source => `
-     <div style="padding:8px 0;border-top:1px solid rgba(255,255,255,.08)">
-      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:11px">
-       <b>${safe(source.source)}</b>
-       <span>${source.expected ? safe(source.expected) + " · ağırlık " + safe(source.weight) : "Net beklenti yok"}</span>
-      </div>
-      <div class="data-quality">
-       Örnek: ${safe(source.sampleCount ?? 0)} maç
-       · TEK: ${safe(source.oddCount ?? 0)}
-       · ÇİFT: ${safe(source.evenCount ?? 0)}
-       ${source.length ? " · Seri/örüntü: " + safe(source.length) : ""}
-      </div>
-      ${source.sequence ? sequenceHTML(source.sequence) : ""}
-      <div class="explanation">${safe(source.summary || "Açıklama bulunamadı.")}</div>
-     </div>
-    `).join("") : '<div class="data-quality">Bu alan için kaynak verisi bulunamadı.</div>'}
-   </div>
-  `;
- }).join("");
-
- return `
-  <div class="history" id="${panelId}">
-   <h3 style="color:#9bcaff;font-size:12px">📊 ALTI ANA BEKLENTİ VE KAYNAK ANALİZİ</h3>
-   ${expectationRows || '<div class="empty">Beklenti verisi bulunamadı.</div>'}
-
-   <h3 style="color:#9bcaff;font-size:12px">🎯 SKOR SENARYOLARI (${scenarios.length}/6)</h3>
-   ${scenarios.length ? `
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:8px">
-     ${scenarios.map(item => `
-      <div class="signal" style="text-align:center">
-       <div style="display:flex;justify-content:space-between;gap:5px;align-items:center;margin-bottom:8px">
-        <span class="pill ${item.source === "ANA SİSTEM" ? "green" : "gold"}">${safe(item.source || "KAYNAK BELİRSİZ")}</span>
-        <span class="data-quality">#${safe(item.rank ?? "-")}</span>
-       </div>
-       <div style="font-size:10px;color:#9bcaff">İLK YARI</div>
-       <b style="font-size:17px">${safe(item.halfTimeScore)}</b>
-       <div style="font-size:10px;color:#9bcaff;margin-top:5px">MAÇ SONU</div>
-       <b style="font-size:20px">${safe(item.finalScore)}</b>
-       <div style="margin-top:8px;color:#ffe2a1;font-size:11px;font-weight:bold">
-        Göreli destek: %${safe(item.supportScore ?? 0)}
-       </div>
-      </div>
-     `).join("")}
-    </div>
-    <div class="data-quality">
-     Ana sistemin net TEK/ÇİFT kararları tüm skorlar için korunur.
-     Destek puanları gerçek gerçekleşme olasılığı değildir; listelenen skorlar
-     arasındaki göreli model desteğini gösterir.
-    </div>
-   ` : '<div class="empty">Yeterli veriyle skor senaryosu üretilemedi.</div>'}
-
-   ${alternative.reason ? `
-    <div class="data-quality" style="margin:8px 0">
-     <b>Alternatif analiz:</b> ${safe(alternative.reason)}
-    </div>
-   ` : alternative.available ? `
-    <div class="data-quality" style="margin:8px 0">
-     Alternatif model gol beklentileri — Ev sahibi: ${safe(alternative.homeExpectedGoals ?? "-")}
-     · Deplasman: ${safe(alternative.awayExpectedGoals ?? "-")}
-     <br>Örnek sayıları — Ev sahibi: ${safe(alternative.homeSamples ?? 0)}
-     · Deplasman: ${safe(alternative.awaySamples ?? 0)}
-    </div>
-   ` : ""}
-
-   <h3 style="color:#9bcaff;font-size:12px">KURAL SİNYALLERİ (${signals.length})</h3>
-   ${signals.length ? signals.map(signalHTML).join("") : '<div class="empty">Bu maçta kural sinyali yok.</div>'}
-
-   <h3 style="color:#ffe2a1;font-size:12px">ÖZEL SERİLER (${special.length})</h3>
-   ${special.length ? special.map(specialHTML).join("") : '<div class="empty">6+ özel seri bulunamadı.</div>'}
-
-   <div class="data-quality">
-    Veri kapsamı:
-    Ev sahibi ${safe(quality.homeHistory ?? 0)} maç |
-    Deplasman ${safe(quality.awayHistory ?? 0)} maç |
-    Hakem ${safe(quality.refereeHistory ?? 0)} maç
-   </div>
-  </div>
- `;
-}
-
-function historyDetails(match,cardKey){
- return `
-  <div class="history" id="history-${cardKey}">
-   <p><b>Hakem:</b> ${safe(match.referee || "Bilgi yok")}</p>
-   ${historyText("Ev sahibi geçmişi",match.homeMatches)}
-   ${historyText("Deplasman geçmişi",match.awayMatches)}
-   ${historyText("Hakem geçmişi",match.refMatches)}
-  </div>
- `;
-}
-
-function togglePanel(id){
- const element = document.getElementById(id);
- if(element) element.classList.toggle("open");
-}
-
-function card(match,sectionKey){
- const signalCount = matchSignalCount(match);
- const specialCount = allSpecial(match).length;
-
- const cardKey = `${sectionKey}-${String(match.id).replace(/[^a-zA-Z0-9_-]/g,"_")}`;
- const analysisId = "analysis-" + cardKey;
- const historyId = "history-" + cardKey;
-
- return `
-  <article class="match">
-   <div class="matchhead">
-    <span class="league">${safe(match.country || "")} · ${safe(match.league || "")}</span>
-    <span class="date">${dateText(match.date)}</span>
-   </div>
-   <div class="teams">
-    <div class="team">${safe(match.home || "Ev sahibi")}</div>
-    <div>
-     <div class="score">${safe(match.finalScore || "VS")}</div>
-     <div class="status">${safe(match.status || "Programda")}</div>
-    </div>
-    <div class="team">${safe(match.away || "Deplasman")}</div>
-   </div>
-   <div class="details">
-    <span class="pill">${finished(match) ? "TAMAMLANDI" : "GELECEK / CANLI"}</span>
-    ${signalCount ? `<span class="pill green">${signalCount} SİNYAL</span>` : `<span class="pill">SİNYAL YOK</span>`}
-    ${specialCount ? `<span class="pill gold">${specialCount} ÖZEL SERİ</span>` : ""}
-   </div>
-   <div class="details">
-    <button class="secondary" onclick="togglePanel('${analysisId}')">📊 Analiz detayları +</button>
-    <button class="secondary" onclick="togglePanel('${historyId}')">📚 Maç geçmişi +</button>
-   </div>
-   ${analysisDetails(match,cardKey)}
-   ${historyDetails(match,cardKey)}
-  </article>
- `;
-}
-
-function toggleFinished(){
- showFinished = !showFinished;
- document.getElementById("finishedBtn").textContent =
-  showFinished ? "🟢 Gelecek Maçları Göster" : "🏁 Biten Maçları Göster";
- render();
-}
-
-function updateStats(){
- const upcoming = allMatches.filter(match => !finished(match)).length;
- document.getElementById("statMatches").textContent = allMatches.length;
- document.getElementById("statUpcoming").textContent = upcoming;
- document.getElementById("statSignals").textContent = analysisMatches.length;
- document.getElementById("statSpecial").textContent =
-  analysisMatches.reduce((sum,match) => sum + allSpecial(match).length,0);
-}
-
-function renderCategory(elementId,countId,matches,emptyText){
- document.getElementById(countId).textContent = matches.length;
- document.getElementById(elementId).innerHTML = matches.length
-  ? matches.map(match => card(match,elementId)).join("")
-  : `<div class="empty">${safe(emptyText)}</div>`;
-}
-
-/* GUNLUK SISTEM TAHMINLERINI EKRANA BAS */
-function renderSystemPredictions(){
- const countElement = document.getElementById("systemPredictionCount");
- const noteElement = document.getElementById("systemPredictionNote");
- const groupsElement = document.getElementById("systemPredictionGroups");
-
- if(!countElement || !noteElement || !groupsElement) return;
-
- if(!systemPredictions || !Array.isArray(systemPredictions.groups)){
-  countElement.textContent = "0";
-  noteElement.textContent = "Günlük sistem tahmin verisi analiz.json içinde bulunamadı.";
-  groupsElement.innerHTML = '<div class="empty">Sistem tahmini henüz oluşturulmadı.</div>';
-  return;
- }
-
- const search = document.getElementById("search").value.toLocaleLowerCase("tr");
- const league = document.getElementById("league").value;
-
- const groups = systemPredictions.groups.map(group => ({
-  ...group,
-  matches: (Array.isArray(group.matches) ? group.matches : []).filter(item => {
-   const searchable = [item.home,item.away,item.league,item.country]
-    .join(" ").toLocaleLowerCase("tr");
-
-   if(search && !searchable.includes(search)) return false;
-   if(league && item.league !== league) return false;
-   return true;
-  })
- })).filter(group => group.matches.length);
-
- const visibleCount = groups.reduce(
-  (sum,group) => sum + group.matches.length,0
- );
-
- countElement.textContent = visibleCount;
-
- noteElement.textContent =
-  `Tahmin tarihi: ${safe(systemPredictions.date || "Bilinmiyor")} · ` +
-  `${visibleCount} maç gösteriliyor · ` +
-  `${safe(systemPredictions.note || "Seçim puanı gerçek olasılık değildir.")}`;
-
- if(!visibleCount){
-  groupsElement.innerHTML =
-   '<div class="empty">Bu filtreye uygun sistem tahmini bulunamadı.</div>';
-  return;
- }
-
- groupsElement.innerHTML = groups.map(group => `
-  <div class="system-group">
-   <h3>${safe(group.title || ("Grup " + group.group))}</h3>
-   ${group.matches.map(item => `
-    <article class="system-pick">
-     <div class="system-pick-head">
-      <span>${safe(item.country || "")} · ${safe(item.league || "")}</span>
-      <span>${safe(dateText(item.date))}</span>
-     </div>
-
-     <div class="system-pick-teams">
-      ${safe(item.home || "Ev sahibi")} – ${safe(item.away || "Deplasman")}
-     </div>
-
-     <div class="system-pick-score">
-      ${safe(item.halfTimeScore || "-")} / ${safe(item.finalScore || "-")}
-     </div>
-
-     <div class="system-pick-meta">
-      İY / MS birleşik skor · Seçim puanı: ${safe(item.selectionScore ?? "-")}/100
-      · Sabit pazar: ${safe(item.fixedMarketCount ?? 0)}/6
-      <br>Kaynak: ${safe(item.scoreSource || "Belirtilmedi")}
-     </div>
-    </article>
-   `).join("")}
-  </div>
- `).join("");
-}
-
-function render(){
- const search = document.getElementById("search").value.toLocaleLowerCase("tr");
- const league = document.getElementById("league").value;
- const sort = document.getElementById("sort").value;
-
- let filtered = allMatches.filter(match => {
-  const searchable = [match.home,match.away,match.league,match.country]
-   .join(" ").toLocaleLowerCase("tr");
-
-  if(search && !searchable.includes(search)) return false;
-  if(league && match.league !== league) return false;
-  if(!showFinished && finished(match)) return false;
-  if(showFinished && !finished(match)) return false;
-  return true;
- });
-
- if(sort === "signals"){
-  filtered.sort((a,b) => matchSignalCount(b) - matchSignalCount(a));
- }else if(showFinished){
-  filtered.sort((a,b) => sort === "new" ? dateValue(b)-dateValue(a) : dateValue(a)-dateValue(b));
- }else{
-  filtered.sort((a,b) => sort === "new" ? dateValue(a)-dateValue(b) : dateValue(b)-dateValue(a));
- }
-
- document.getElementById("summary").textContent =
-  `${filtered.length} maç gösteriliyor · ${allMatches.length} toplam kayıt`;
-
- document.getElementById("allCount").textContent = filtered.length;
-
- document.getElementById("allMatches").innerHTML = filtered.length
-  ? filtered.map(match => card(match,"allMatches")).join("")
-  : '<div class="empty">Bu filtrede maç bulunamadı.</div>';
-
- const analysisFiltered = filtered.filter(match => getAnalysis(match));
- const allSignalMatches = analysisFiltered.filter(match => allSignals(match).length > 0);
- const specialMatches = analysisFiltered.filter(match => allSpecial(match).length > 0);
- const patternMatches = analysisFiltered.filter(match =>
-  allSignals(match).some(signal => signal.kind === "ÖRÜNTÜ")
- );
- const htMatches = analysisFiltered.filter(match =>
-  allSignals(match).some(signal => String(signal.rule || "").includes("İY"))
- );
-
- renderCategory("cat1","count1",allSignalMatches,"Bu filtrede seri veya örüntü sinyali bulunamadı.");
- renderCategory("cat2","count2",specialMatches,"Bu filtrede 6+ özel seri bulunamadı.");
- renderCategory("cat3","count3",patternMatches,"Bu filtrede örüntü sinyali bulunamadı.");
- renderCategory("cat4","count4",htMatches,"Bu filtrede ilk yarı sinyali bulunamadı.");
-
- updateStats();
- renderSystemPredictions();
-}
-
-async function loadData(){
- const summary = document.getElementById("summary");
- summary.textContent = "Bülten ve analiz dosyaları yükleniyor...";
-
- try{
-  const [bulletinResponse,analysisResponse] = await Promise.all([
-   fetch("./bulten.json?v=" + Date.now(),{cache:"no-store"}),
-   fetch("./analiz.json?v=" + Date.now(),{cache:"no-store"})
-  ]);
-
-  if(!bulletinResponse.ok) throw new Error("Bülten yüklenemedi: " + bulletinResponse.status);
-  if(!analysisResponse.ok) throw new Error("Analiz dosyası henüz bulunamadı: " + analysisResponse.status);
-
-  const bulletin = await bulletinResponse.json();
-  const analysis = await analysisResponse.json();
-
-  if(!Array.isArray(bulletin)) throw new Error("bulten.json liste formatında değil.");
-  if(!analysis || !Array.isArray(analysis.matches)) throw new Error("analiz.json formatı geçersiz.");
-
-  allMatches = bulletin;
-  analysisMatches = analysis.matches;
-  analysisById = new Map(analysisMatches.map(match => [String(match.id),match]));
-  systemPredictions = analysis.systemPredictions || null;
-
-  const leagues = [...new Set(allMatches.map(match => match.league).filter(Boolean))]
-   .sort((a,b) => a.localeCompare(b,"tr"));
-
-  document.getElementById("league").innerHTML =
-   '<option value="">Tüm Ligler</option>' +
-   leagues.map(name => `<option value="${safe(name)}">${safe(name)}</option>`).join("");
-
-  const generatedAt = analysis.generatedAt ? dateText(analysis.generatedAt) : "Bilinmiyor";
-  document.getElementById("updated").textContent = "Analiz üretim zamanı: " + generatedAt;
-
-  render();
-
- }catch(error){
-  summary.textContent = "Veri yükleme hatası: " + error.message;
-  document.getElementById("allMatches").innerHTML =
-   `<div class="empty">${safe(error.message)}</div>`;
-
-  [[ "cat1","count1" ],[ "cat2","count2" ],[ "cat3","count3" ],[ "cat4","count4" ]].forEach(([elementId,countId]) => {
-   document.getElementById(elementId).innerHTML =
-    '<div class="empty">Analiz verileri yüklenemedi.</div>';
-   document.getElementById(countId).textContent = "0";
-  });
-
-  renderSystemPredictions();
- }
-}
-
-document.getElementById("search").addEventListener("input",render);
-document.getElementById("league").addEventListener("change",render);
-document.getElementById("sort").addEventListener("change",render);
-
-loadData();
+const $=id=>document.getElementById(id);
+let allMatches=[],analysisMatches=[],analysisById=new Map(),systemPredictions=null,showFinished=false;
+const safe=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function dateValue(value){if(!value)return null;const d=new Date(value);return Number.isNaN(d.getTime())?null:d;}
+function dateText(value){const d=dateValue(value);return d?d.toLocaleString("tr-TR",{dateStyle:"short",timeStyle:"short"}):"Tarih bilinmiyor";}
+function dayKey(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+function dateMatches(match){const filter=$("dateFilter").value;if(filter==="all")return true;const d=dateValue(match.date);if(!d)return false;const now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate()),target=new Date(d.getFullYear(),d.getMonth(),d.getDate()),diff=Math.round((target-today)/86400000);if(filter==="today")return diff===0;if(filter==="tomorrow")return diff===1;if(filter==="next7")return diff>=0&&diff<7;return true;}
+function finished(match){const d=dateValue(match.date);return d?d.getTime()<Date.now():false;}
+function getAnalysis(match){return analysisById.get(String(match.id))||null;}
+function allSignals(match){const a=getAnalysis(match);return a&&Array.isArray(a.signals)?a.signals:[];}
+function allSpecial(match){const a=getAnalysis(match);return a&&Array.isArray(a.specialSeries)?a.specialSeries:[];}
+function matchSignalCount(match){const a=getAnalysis(match);return a?Number(a.signalCount??(a.signals||[]).length):0;}
+function maxLength(match,kind){const a=getAnalysis(match);if(!a)return 0;const list=(a.signals||[]).filter(s=>!kind||s.kind===kind);return Math.max(0,...list.map(s=>Number(s.currentLength??s.length??s.seriesLength??0)),...(kind==="SERİ"?(a.specialSeries||[]).map(s=>Number(s.length??s.currentLength??0)):[]));}
+function sortMatches(matches){const mode=$("sort").value;return [...matches].sort((a,b)=>{if(mode==="new"||mode==="old"){const da=dateValue(a.date)?.getTime()??Infinity,db=dateValue(b.date)?.getTime()??Infinity;return mode==="new"?da-db:db-da;}return matchSignalCount(b)-matchSignalCount(a)||maxLength(b,"SERİ")-maxLength(a,"SERİ")||maxLength(b,"ÖRÜNTÜ")-maxLength(a,"ÖRÜNTÜ")||(dateValue(a.date)?.getTime()??Infinity)-(dateValue(b.date)?.getTime()??Infinity);});}
+function sequenceHTML(sequence){if(!Array.isArray(sequence)||!sequence.length)return"";return `<div class="sequence">${sequence.map(v=>`<span class="${String(v).toUpperCase()==="TEK"?"odd":"even"}">${safe(v)}</span>`).join("")}</div>`;}
+function card(match){const a=getAnalysis(match),signals=allSignals(match),special=allSpecial(match),count=matchSignalCount(match),max=Math.max(maxLength(match,"SERİ"),maxLength(match,"ÖRÜNTÜ"));return `<article class="match" role="button" tabindex="0" onclick="openDetailById('${safe(match.id)}')" onkeydown="if(event.key==='Enter'){openDetailById('${safe(match.id)}')}"><div class="matchhead"><span class="league">${safe(match.country||"")} · ${safe(match.league||"")}</span><span class="date">${dateText(match.date)}</span></div><div class="teams"><div class="team">${safe(match.home||"Ev sahibi")}</div><div><div class="score">VS</div><div class="status">MAÇ</div></div><div class="team">${safe(match.away||"Deplasman")}</div></div><div class="details"><span class="pill">${count} sinyal</span><span class="pill gold">En uzun seri/örüntü: ${max}</span><span class="pill">${special.length} özel seri</span></div></article>`;}
+function summaryFor(match,analysis){if(!analysis)return"Bu maç için ayrıntılı analiz kaydı bulunamadı.";return analysis.summary||`${matchSignalCount(match)} sinyal bulundu. En uzun seri/örüntü uzunluğu ${Math.max(maxLength(match,"SERİ"),maxLength(match,"ÖRÜNTÜ"))}.`;}
+function scoreCards(scenarios){if(!Array.isArray(scenarios)||!scenarios.length)return'<div class="empty">Skor senaryosu bulunamadı.</div>';return `<div class="score-grid">${scenarios.map(s=>{const main=s.source==="ANA SİSTEM";return `<div class="score-card ${main?"main":"alt"}"><div class="pill ${main?"green":"gold"}">${safe(s.source||"Skor senaryosu")}</div><div class="score-big">${safe(s.halfTimeScore||"-")} / ${safe(s.finalScore||"-")}</div><div class="score-sub">Destek puanı: ${safe(s.supportScore??"-")} · Sıra: ${safe(s.rank??"-")}<br>Uyumlu pazar: ${safe(s.matchedMarkets??"-")} · Çelişen: ${safe(s.conflictingMarkets??"-")}</div></div>`;}).join("")}</div>`;}
+function signalHTML(s){return `<div class="signal"><div class="signal-title"><b>${safe(s.name||s.rule||s.kind||"Sinyal")}</b><span class="pill">${safe(s.kind||"")}</span></div><div class="data-quality">Kural: ${safe(s.rule||"-")} · Mevcut uzunluk: ${safe(s.currentLength??s.length??"-")}</div>${sequenceHTML(s.sequence||s.history)}<p>${safe(s.summary||s.description||"")}</p><div class="expected">Beklenti: ${safe(s.expectation||s.expected||"-")}</div></div>`;}
+function specialHTML(s){return `<div class="special"><strong>${safe(s.name||s.rule||"Özel seri")} · Uzunluk: ${safe(s.length??s.currentLength??"-")}</strong><p>${safe(s.summary||s.description||"")}</p>${sequenceHTML(s.sequence)}</div>`;}
+function openDetailById(id){const match=allMatches.find(m=>String(m.id)===String(id));if(match)openDetail(match);}
+function openDetail(match){const analysis=getAnalysis(match),signals=allSignals(match),special=allSpecial(match),scenarios=analysis?.scoreScenarios||[],expectations=analysis?.expectations||{},details=analysis?.expectationDetails||{},alternative=analysis?.alternativeAnalysis||{},quality=analysis?.dataQuality||{},goalQuality=analysis?.goalDataQuality||{};$("detailTitle").textContent=`${match.home||"Ev sahibi"} – ${match.away||"Deplasman"}`;const expRows=Object.entries(expectations).map(([market,value])=>{const d=details[market]||{},votes=d.votes||{};const sources=Array.isArray(d.sources)?d.sources:[];return `<div class="signal"><div class="signal-title"><b>${safe(market)}</b><span class="expected">${safe(value)}</span></div><div class="data-quality">Ağırlıklı destek — TEK: ${safe(votes.TEK??0)} · ÇİFT: ${safe(votes["ÇİFT"]??0)} · Destekleyen grup: ${safe(d.supportCount??0)}${d.conflict?" · Kaynaklar çelişiyor":""}</div>${sources.map(s=>`<div class="source-row"><div class="signal-title"><b>${safe(s.source||"Kaynak")}</b><span>${s.expected?safe(s.expected)+" · ağırlık "+safe(s.weight):"Net beklenti yok"}</span></div><div class="data-quality">Örnek: ${safe(s.sampleCount??0)} / ${safe(s.totalSampleCount??0)} maç · TEK: ${safe(s.oddCount??0)} · ÇİFT: ${safe(s.evenCount??0)} ${s.length?"· Seri/örüntü: "+safe(s.length):""}</div>${s.sequence?sequenceHTML(s.sequence):""}<div class="explanation">${safe(s.summary||"")}</div></div>`).join("")}</div>`;}).join("");const data=`<div class="detail-hero"><div class="detail-league">${safe(match.country||"")} · ${safe(match.league||"")} · ${dateText(match.date)}</div><div class="detail-teams"><div class="detail-team">${safe(match.home||"Ev sahibi")}</div><div class="detail-vs">VS</div><div class="detail-team">${safe(match.away||"Deplasman")}</div></div><div class="detail-summary">${safe(summaryFor(match,analysis))}</div></div>${analysis?`<section class="detail-section"><h3>🎯 OLASI SKOR SENARYOLARI · ${scenarios.length}/6</h3>${scoreCards(scenarios)}<div class="data-quality">Ana Sistem: bütün kesin TEK/ÇİFT beklentileriyle uyumlu skor. Uzlaştırılmış Alternatif: en az bir beklentiyle çelişen, ayrı etiketlenmiş skor. Göreli destek gerçek olasılık değildir.</div>${alternative.reason?`<div class="data-quality"><b>Alternatif analiz:</b> ${safe(alternative.reason)}</div>`:""}</section><section class="detail-section"><h3>📈 SERİ VE ÖRÜNTÜ SİNYALLERİ (${signals.length})</h3>${signals.length?signals.map(signalHTML).join(""):'<div class="empty">Kural sinyali bulunamadı.</div>'}</section><section class="detail-section"><h3>🔥 ÖZEL SERİLER (${special.length})</h3>${special.length?special.map(specialHTML).join(""):'<div class="empty">6+ özel seri bulunamadı.</div>'}</section><section class="detail-section"><h3>🧭 ALTI ANA BEKLENTİ VE KAYNAKLAR</h3>${expRows||'<div class="empty">Beklenti verisi bulunamadı.</div>'}</section><section class="detail-section"><h3>🧪 VERİ KALİTESİ</h3><div class="data-quality">Geçmiş maç kapsamı — Ev sahibi: ${safe(quality.homeHistory??0)} · Deplasman: ${safe(quality.awayHistory??0)} · Hakem: ${safe(quality.refereeHistory??0)}<br>Gol örnekleri — Ev attı: ${safe(goalQuality.homeScored??0)} · Ev yedi: ${safe(goalQuality.homeConceded??0)} · Dep attı: ${safe(goalQuality.awayScored??0)} · Dep yedi: ${safe(goalQuality.awayConceded??0)}<br>Gol beklentisi — Ev: ${safe(alternative.homeExpectedGoals??"-")} · Dep: ${safe(alternative.awayExpectedGoals??"-")}</div><details class="deep"><summary>Yöntem ve hesaplama notları</summary><p class="data-quality">Skor destek puanları model içi göreli sıralamadır, gerçekleşme olasılığı değildir. Örüntü beklentileri örüntünün bozulma senaryosunu ifade eder. Geçmiş veriler tek başına gelecek sonucu garanti etmez.</p></details></section>`:'<section class="detail-section"><div class="empty">Bu maç analiz_motoru tarafından sinyalli maçlar arasına alınmamış. Bülten bilgileri mevcut, ayrıntılı analiz kaydı yok.</div></section>'}`;$("detailContent").innerHTML=data;$("detailScreen").classList.add("open");document.body.style.overflow="hidden";}
+function closeDetail(){$("detailScreen").classList.remove("open");document.body.style.overflow="";}
+function toggleFinished(){showFinished=!showFinished;$("finishedBtn").textContent=showFinished?"🟢 Gelecek Maçları Göster":"🏁 Biten Maçları Göster";render();}
+function renderCategory(elementId,countId,matches,emptyText){$(countId).textContent=matches.length;$(elementId).innerHTML=matches.length?matches.map(m=>card(m)).join(""):`<div class="empty">${safe(emptyText)}</div>`;}
+function renderSystemPredictions(){const groupsElement=$("systemPredictionGroups");if(!systemPredictions||!Array.isArray(systemPredictions.groups)){$("systemPredictionCount").textContent="0";$("systemPredictionNote").textContent="Günlük sistem tahmin verisi analiz.json içinde bulunamadı." ;groupsElement.innerHTML='<div class="empty">Sistem tahmini henüz oluşturulmadı.</div>';return;}const search=$("search").value.toLocaleLowerCase("tr"),league=$("league").value;const groups=systemPredictions.groups.map(g=>({...g,matches:(g.matches||[]).filter(m=>{const text=[m.home,m.away,m.league,m.country].join(" ").toLocaleLowerCase("tr");return (!search||text.includes(search))&&(!league||m.league===league)&&dateMatches(m);})})).filter(g=>g.matches.length);const count=groups.reduce((n,g)=>n+g.matches.length,0);$("systemPredictionCount").textContent=count;$("systemPredictionNote").textContent=`Tahmin tarihi: ${safe(systemPredictions.date||"Bilinmiyor")} · ${count} maç gösteriliyor · ${safe(systemPredictions.note||"Seçim puanı gerçek olasılık değildir.")}`;groupsElement.innerHTML=count?groups.map(g=>`<div class="system-group"><h3>${safe(g.title||("Grup "+g.group))}</h3>${g.matches.map(m=>`<article class="system-pick" role="button" tabindex="0" onclick="openDetailById('${safe(m.id)}')" onkeydown="if(event.key==='Enter'){openDetailById('${safe(m.id)}')}"><div class="system-pick-head"><span>${safe(m.country||"")} · ${safe(m.league||"")}</span><span>${dateText(m.date)}</span></div><div class="system-pick-teams">${safe(m.home||"Ev sahibi")} – ${safe(m.away||"Deplasman")}</div><div class="system-pick-score">${safe(m.halfTimeScore||"-")} / ${safe(m.finalScore||"-")}</div><div class="system-pick-meta">İY / MS birleşik skor · Seçim puanı: ${safe(m.selectionScore??"-")}/100 · Sabit pazar: ${safe(m.fixedMarketCount??0)}/6<br>Kaynak: ${safe(m.scoreSource||"Belirtilmedi")} · Detay için dokun</div></article>`).join("")}</div>`).join(""):'<div class="empty">Bu filtreye uygun sistem tahmini bulunamadı.</div>';}
+function render(){const search=$("search").value.toLocaleLowerCase("tr"),league=$("league").value;let filtered=allMatches.filter(m=>{const text=[m.home,m.away,m.league,m.country].join(" ").toLocaleLowerCase("tr");return (!search||text.includes(search))&&(!league||m.league===league)&&dateMatches(m)&&(showFinished?finished(m):!finished(m));});filtered=sortMatches(filtered);$("summary").textContent=`${filtered.length} maç gösteriliyor · ${allMatches.length} toplam kayıt`;$("allCount").textContent=filtered.length;$("allMatches").innerHTML=filtered.length?filtered.map(m=>card(m)).join(""):'<div class="empty">Bu filtrede maç bulunamadı.</div>';const analyzed=filtered.filter(m=>getAnalysis(m));const series=analyzed.filter(m=>allSignals(m).some(s=>s.kind==="SERİ")||allSpecial(m).length);const patterns=analyzed.filter(m=>allSignals(m).some(s=>s.kind==="ÖRÜNTÜ"));const special=analyzed.filter(m=>allSpecial(m).length);const ht=analyzed.filter(m=>allSignals(m).some(s=>String(s.rule||"").includes("İY")));renderCategory("cat1","count1",sortMatches(series).sort((a,b)=>matchSignalCount(b)-matchSignalCount(a)||maxLength(b,"SERİ")-maxLength(a,"SERİ")),"Bu filtrede seri bulunamadı.");renderCategory("cat2","count2",sortMatches(patterns).sort((a,b)=>matchSignalCount(b)-matchSignalCount(a)||maxLength(b,"ÖRÜNTÜ")-maxLength(a,"ÖRÜNTÜ")),"Bu filtrede örüntü bulunamadı.");renderCategory("cat3","count3",sortMatches(special),"Bu filtrede 6+ özel seri bulunamadı.");renderCategory("cat4","count4",sortMatches(ht),"Bu filtrede ilk yarı sinyali bulunamadı.");$("statMatches").textContent=allMatches.length;$("statUpcoming").textContent=allMatches.filter(m=>!finished(m)).length;$("statSignals").textContent=analysisMatches.length;$("statSpecial").textContent=analysisMatches.reduce((n,m)=>n+(m.specialSeries||[]).length,0);renderSystemPredictions();}
+async function loadData(){$("summary").textContent="Bülten ve analiz dosyaları yükleniyor...";try{const [br,ar]=await Promise.all([fetch("./bulten.json?v="+Date.now(),{cache:"no-store"}),fetch("./analiz.json?v="+Date.now(),{cache:"no-store"})]);if(!br.ok)throw new Error("Bülten yüklenemedi: "+br.status);if(!ar.ok)throw new Error("Analiz dosyası henüz bulunamadı: "+ar.status);const bulletin=await br.json(),analysis=await ar.json();if(!Array.isArray(bulletin))throw new Error("bulten.json liste formatında değil.");if(!analysis||!Array.isArray(analysis.matches))throw new Error("analiz.json formatı geçersiz.");allMatches=bulletin;analysisMatches=analysis.matches;analysisById=new Map(analysisMatches.map(m=>[String(m.id),m]));systemPredictions=analysis.systemPredictions||null;const leagues=[...new Set(allMatches.map(m=>m.league).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"tr"));const previous=$("league").value;$("league").innerHTML='<option value="">Tüm Ligler</option>'+leagues.map(n=>`<option value="${safe(n)}">${safe(n)}</option>`).join("");if(leagues.includes(previous))$("league").value=previous;$("updated").textContent="Analiz üretim zamanı: "+(analysis.generatedAt?dateText(analysis.generatedAt):"Bilinmiyor");render();}catch(error){$("summary").textContent="Veri yükleme hatası: "+error.message;$("allMatches").innerHTML=`<div class="empty">${safe(error.message)}</div>`;["cat1","cat2","cat3","cat4"].forEach(id=>$(id).innerHTML='<div class="empty">Analiz verileri yüklenemedi.</div>');renderSystemPredictions();}}
+$("search").addEventListener("input",render);$("league").addEventListener("change",render);$("sort").addEventListener("change",render);$("dateFilter").addEventListener("change",render);$("detailScreen").addEventListener("click",e=>{if(e.target===$("detailScreen"))closeDetail();});document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDetail();});loadData();
 </script>
 </body>
 </html>
