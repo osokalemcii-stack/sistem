@@ -11,6 +11,7 @@ from pathlib import Path
 # ============================================================
 # TEK / CIFT ANALIZ MOTORU - VERI TOPLAYICI
 # 25 lig | 90 gun ilk yukleme | kota kontrollu devam mekanizmasi
+# KALICI MAC ARSIVI
 # ============================================================
 
 BASE_URL = "https://api.sportstatsapi.com/api/v1"
@@ -33,7 +34,6 @@ TODAY = datetime.now(timezone.utc).date()
 BOOTSTRAP_DAYS = 90
 INCREMENTAL_DAYS = 7
 FUTURE_DAYS = 14
-HISTORY_LIMIT = 12
 PAGE_LIMIT = 100
 MAX_PAGES_PER_LEAGUE_PER_RUN = 3
 
@@ -643,30 +643,11 @@ persist_archive()
 
 
 # ============================================================
-# ARSIVI TEMIZLE VE GECMISI OLUSTUR
+# KALICI ARSIVDEN GECMISI OLUSTUR
 # ============================================================
 
-cutoff = TODAY - timedelta(days=180)
-
-clean_archive = {}
-
-for item_id, item in archive.items():
-
-    raw_date = item.get("date") or ""
-
-    try:
-        parsed = datetime.fromisoformat(
-            raw_date.replace("Z", "+00:00")
-        ).date()
-    except Exception:
-        continue
-
-    if parsed >= cutoff:
-        clean_archive[item_id] = item
-
-
-archive = clean_archive
-
+# Arsivden tarih sinirina gore kayit silinmez.
+# Tarihi eksik veya farkli formatta olan maclar da korunur.
 all_matches = sorted(
     archive.values(),
     key=lambda x: x.get("date") or ""
@@ -734,16 +715,17 @@ for match in all_matches:
     away_key = normalize_name(match.get("away"))
     ref_key = normalize_name(match.get("referee"))
 
+    # Tum gecmis korunur; 12 maclik kesme uygulanmaz.
     match["homeMatches"] = (
-        team_history.get(home_key, [])[-HISTORY_LIMIT:][::-1]
+        team_history.get(home_key, [])[::-1]
     )
 
     match["awayMatches"] = (
-        team_history.get(away_key, [])[-HISTORY_LIMIT:][::-1]
+        team_history.get(away_key, [])[::-1]
     )
 
     match["refMatches"] = (
-        referee_history.get(ref_key, [])[-HISTORY_LIMIT:][::-1]
+        referee_history.get(ref_key, [])[::-1]
     )
 
     if not is_finished(match):
