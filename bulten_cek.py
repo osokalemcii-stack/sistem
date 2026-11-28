@@ -1,3 +1,4 @@
+
 import os
 import re
 import json
@@ -221,6 +222,10 @@ class DailyQuotaReached(Exception):
     pass
 
 
+class FatalAPIError(Exception):
+    pass
+
+
 def api_get(path, params):
     global last_request_time
     global api_call_count
@@ -247,6 +252,13 @@ def api_get(path, params):
     last_request_time = time.time()
     api_call_count += 1
 
+    if response.status_code in (401, 403):
+        raise FatalAPIError(
+            f"API yetkilendirme hatasi (HTTP {response.status_code}). "
+            "API anahtari veya hesap yetkisi kontrol edilmeli. "
+            "Ek istek gonderilmeyecek."
+        )
+
     if response.status_code == 429:
         retry_after = response.headers.get("Retry-After", "")
 
@@ -266,13 +278,31 @@ def api_get(path, params):
             "ilerleme kaydedilecek."
         )
 
-    response.raise_for_status()
+    if response.status_code >= 400:
+        raise FatalAPIError(
+            f"API HTTP hatasi verdi (HTTP {response.status_code}). "
+            "Ek istek gonderilmeyecek."
+        )
 
-    payload = response.json()
+    try:
+        payload = response.json()
+    except ValueError as error:
+        raise FatalAPIError(
+            f"API JSON yaniti okunamadi: {error}. "
+            "Ek istek gonderilmeyecek."
+        )
 
     if not isinstance(payload, dict) or not payload.get("success"):
-        raise RuntimeError(
-            f"API basarisiz yanit verdi: {payload}"
+        message = (
+            payload.get("message")
+            or payload.get("error")
+            or "API success alanini true dondurmedi."
+            if isinstance(payload, dict)
+            else "API beklenmeyen yanit bicimi dondurdu."
+        )
+        raise FatalAPIError(
+            f"API basarisiz yanit verdi: {message} "
+            "Ek istek gonderilmeyecek."
         )
 
     return payload
@@ -548,6 +578,23 @@ for league_index, league in enumerate(LEAGUES, start=1):
 
         quota_error = str(error)
         log(f"\nKOTA/HIZ SINIRI: {quota_error}")
+        persist_archive()
+        break
+
+    except FatalAPIError as error:
+
+        quota_error = str(error)
+        log(f"\nKRITIK API HATASI: {quota_error}")
+        persist_archive()
+        break
+
+    except requests.RequestException as error:
+
+        quota_error = (
+            f"Ag/HTTP baglanti hatasi: {error}. "
+            "Ek API istegi gonderilmedi."
+        )
+        log(f"\nBAGLANTI HATASI: {quota_error}")
         persist_archive()
         break
 
