@@ -750,12 +750,36 @@ def generate_alternative_scores(
         )
     )
 
-    if expected_home is None or expected_away is None:
+    minimum_samples = 3
+    sample_counts = {
+        "homeScored": home_profile["sampleScored"],
+        "homeConceded": home_profile["sampleConceded"],
+        "awayScored": away_profile["sampleScored"],
+        "awayConceded": away_profile["sampleConceded"]
+    }
+
+    insufficient = {
+        name: count
+        for name, count in sample_counts.items()
+        if count < minimum_samples
+    }
+
+    if (
+        expected_home is None
+        or expected_away is None
+        or insufficient
+    ):
         return [], {
             "available": False,
-            "reason": "Gol ortalamalarını hesaplamak için yeterli takım verisi yok.",
+            "reason": (
+                "Alternatif tahmin için ev ve deplasman takımlarının "
+                "attığı ve yediği gollerde ayrı ayrı en az 3 geçerli maç "
+                "verisi gerekiyor."
+            ),
             "homeExpectedGoals": expected_home,
-            "awayExpectedGoals": expected_away
+            "awayExpectedGoals": expected_away,
+            "sampleCounts": sample_counts,
+            "minimumSamples": minimum_samples
         }
 
     candidates = []
