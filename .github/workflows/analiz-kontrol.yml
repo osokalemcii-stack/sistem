@@ -1,0 +1,87 @@
+
+name: Analiz Motoru Kontrol (API kullanmaz)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analiz-kontrol:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Depoyu indir
+        uses: actions/checkout@v4
+
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Python sozdizimini kontrol et
+        run: python -m py_compile analiz_motoru.py
+
+      - name: Analiz motorunu calistir
+        run: python -u analiz_motoru.py
+
+      - name: Analiz ciktisini dogrula
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("analiz.json")
+
+          if not path.exists():
+              raise SystemExit("analiz.json uretilmedi")
+
+          with path.open("r", encoding="utf-8") as f:
+              data = json.load(f)
+
+          if not isinstance(data, dict):
+              raise SystemExit("Gecersiz JSON yapisi")
+
+          matches = data.get("matches")
+          if not isinstance(matches, list):
+              raise SystemExit("matches listesi bulunamadi")
+
+          system = data.get("systemPredictions")
+          if not isinstance(system, dict):
+              raise SystemExit("systemPredictions bulunamadi")
+
+          groups = system.get("groups")
+          if not isinstance(groups, list):
+              raise SystemExit("groups listesi bulunamadi")
+
+          if len(groups) > 3:
+              raise SystemExit("3 gruptan fazla tahmin olustu")
+
+          total = 0
+
+          for group in groups:
+              picks = group.get("matches")
+
+              if not isinstance(picks, list):
+                  raise SystemExit("Grup mac listesi gecersiz")
+
+              if len(picks) > 4:
+                  raise SystemExit("Bir grupta 4'ten fazla mac var")
+
+              total += len(picks)
+
+          if total != system.get("selectedCount"):
+              raise SystemExit("Tahmin sayisi uyusmuyor")
+
+          if total > 12:
+              raise SystemExit("12'den fazla tahmin olustu")
+
+          print("DOGRULAMA BASARILI")
+          print("Analiz edilen mac:", len(matches))
+          print("Tahmin grubu:", len(groups))
+          print("Tahmin sayisi:", str(total) + "/12")
+          print("Uretim zamani:", data.get("generatedAt"))
+          print("Hedef tarih:", system.get("date"))
+          PY
