@@ -375,61 +375,199 @@ def is_upcoming(match, now):
 # BEKLENTI MOTORU
 # ============================================================
 
-def build_expectations(home_history, away_history):
+def prediction_for_values(values):
+    """
+    Bir veri kaynağından tek bir beklenti üretir.
+    Öncelik 4+ maçlık seridedir; seri yoksa son dört kayıttaki
+    tanımlı örüntüler değerlendirilir.
+    """
+    run = streak(values)
 
-    expectations = {
-        "İY": "DEĞİŞKEN",
-        "İY EV": "DEĞİŞKEN",
-        "İY DEP": "DEĞİŞKEN",
-        "MS": "DEĞİŞKEN",
-        "MS EV": "DEĞİŞKEN",
-        "MS DEP": "DEĞİŞKEN"
+    if run:
+        return {
+            "expected": run["expected"],
+            "kind": "SERİ",
+            "length": run["length"],
+            "last": run["last"],
+            "sequence": run["sequence"],
+            "weight": run["length"]
+        }
+
+    pattern = alternating(values)
+
+    if pattern:
+        return {
+            "expected": pattern["expected"],
+            "kind": "ÖRÜNTÜ",
+            "length": PATTERN_LENGTH,
+            "last": values[-1],
+            "sequence": pattern["sequence"],
+            "pattern": pattern["pattern"],
+            "weight": PATTERN_LENGTH
+        }
+
+    pattern = paired(values)
+
+    if pattern:
+        return {
+            "expected": pattern["expected"],
+            "kind": "ÖRÜNTÜ",
+            "length": PATTERN_LENGTH,
+            "last": values[-1],
+            "sequence": pattern["sequence"],
+            "pattern": pattern["pattern"],
+            "weight": PATTERN_LENGTH
+        }
+
+    return None
+
+
+def build_expectations(home_history, away_history, ref_history):
+    """
+    Her pazar için üç ayrı veri kaynağını karşılaştırır.
+    Her kaynak en fazla bir oy verir. Uzun seriler daha ağır basar.
+    """
+    markets = {
+        "İY": [
+            ("EV TAKIM GEÇMİŞİ", total_values(home_history, "halfTimeScore")),
+            ("DEP TAKIM GEÇMİŞİ", total_values(away_history, "halfTimeScore")),
+            ("HAKEM GEÇMİŞİ", total_values(ref_history, "halfTimeScore"))
+        ],
+        "İY EV": [
+            ("EVİN ATTIĞI İY GOL", own_values(home_history, "teamGoalsHT")),
+            ("DEP'İN YEDİRDİĞİ İY GOL", own_values(away_history, "opponentGoalsHT")),
+            ("HAKEM EV İY GOL", side_values(ref_history, "halfTimeScore", "home"))
+        ],
+        "İY DEP": [
+            ("DEP'İN ATTIĞI İY GOL", own_values(away_history, "teamGoalsHT")),
+            ("EVİN YEDİRDİĞİ İY GOL", own_values(home_history, "opponentGoalsHT")),
+            ("HAKEM DEP İY GOL", side_values(ref_history, "halfTimeScore", "away"))
+        ],
+        "MS": [
+            ("EV TAKIM GEÇMİŞİ", total_values(home_history, "finalScore")),
+            ("DEP TAKIM GEÇMİŞİ", total_values(away_history, "finalScore")),
+            ("HAKEM GEÇMİŞİ", total_values(ref_history, "finalScore"))
+        ],
+        "MS EV": [
+            ("EVİN ATTIĞI MS GOL", own_values(home_history, "teamGoalsFT")),
+            ("DEP'İN YEDİRDİĞİ MS GOL", own_values(away_history, "opponentGoalsFT")),
+            ("HAKEM EV MS GOL", side_values(ref_history, "finalScore", "home"))
+        ],
+        "MS DEP": [
+            ("DEP'İN ATTIĞI MS GOL", own_values(away_history, "teamGoalsFT")),
+            ("EVİN YEDİRDİĞİ MS GOL", own_values(home_history, "opponentGoalsFT")),
+            ("HAKEM DEP MS GOL", side_values(ref_history, "finalScore", "away"))
+        ]
     }
 
-    # İY toplam tek/cift beklentisi
-    ht_candidates = []
+    expectations = {}
+    details = {}
 
-    # MS toplam tek/cift beklentisi
-    ft_candidates = []
+    for market, sources in markets.items():
+        votes = {"TEK": 0, "ÇİFT": 0}
+        source_details = []
 
-    for history in (home_history, away_history):
+        for source_name, values in sources:
+            prediction = prediction_for_values(values)
 
-        ht_result = streak(
-            total_values(history, "halfTimeScore")
+            if not prediction:
+                continue
+
+            expected = prediction["expected"]
+            weight = prediction["weight"]
+            votes[expected] += weight
+
+            source_details.append({
+                "source": source_name,
+                "expected": expected,
+                "kind": prediction["kind"],
+                "length": prediction["length"],
+                "weight": weight,
+                "last": prediction.get("last"),
+                "sequence": prediction.get("sequence", []),
+                "pattern": prediction.get("pattern")
+            })
+
+        if votes["TEK"] > votes["ÇİFT"]:
+            decision = "TEK"
+        elif votes["ÇİFT"] > votes["TEK"]:
+            decision = "ÇİFT"
+        else:
+            decision = "DEĞİŞKEN"
+
+        expectations[market] = decision
+        details[market] = {
+            "decision": decision,
+            "votes": votes,
+            "sources": source_details,
+            "supportCount": sum(1 for item in source_details if item["expected"] == decision)
+                if decision != "DEĞİŞKEN" else 0,
+            "conflict": votes["TEK"] > 0 and votes["ÇİFT"] > 0
+        }
+
+    return expectations, details
+
+
+def generate_score_scenarios(expectations, limit=12):
+    """
+    Altı beklentiyle uyumlu İY ve MS skor çiftleri üretir.
+    DEĞİŞKEN alanlar filtreleme yapmaz. Bu skorlar olasılık değil,
+    yalnızca belirtilen tek/çift koşullarını sağlayan senaryolardır.
+    """
+    ht_total = expectations.get("İY", "DEĞİŞKEN")
+    ht_home = expectations.get("İY EV", "DEĞİŞKEN")
+    ht_away = expectations.get("İY DEP", "DEĞİŞKEN")
+    ft_total = expectations.get("MS", "DEĞİŞKEN")
+    ft_home = expectations.get("MS EV", "DEĞİŞKEN")
+    ft_away = expectations.get("MS DEP", "DEĞİŞKEN")
+
+    def matches(value, expected):
+        return expected == "DEĞİŞKEN" or parity(value) == expected
+
+    half_scores = []
+    for home_ht in range(5):
+        for away_ht in range(5):
+            if not matches(home_ht + away_ht, ht_total):
+                continue
+            if not matches(home_ht, ht_home):
+                continue
+            if not matches(away_ht, ht_away):
+                continue
+            half_scores.append((home_ht, away_ht))
+
+    full_scores = []
+    for home_ft in range(7):
+        for away_ft in range(7):
+            if not matches(home_ft + away_ft, ft_total):
+                continue
+            if not matches(home_ft, ft_home):
+                continue
+            if not matches(away_ft, ft_away):
+                continue
+            full_scores.append((home_ft, away_ft))
+
+    scenarios = []
+
+    for home_ht, away_ht in half_scores:
+        for home_ft, away_ft in full_scores:
+            if home_ft < home_ht or away_ft < away_ht:
+                continue
+
+            scenarios.append({
+                "halfTimeScore": f"{home_ht}-{away_ht}",
+                "finalScore": f"{home_ft}-{away_ft}"
+            })
+
+    # Daha düşük toplam gollü uyumlu senaryoları önce göster.
+    scenarios.sort(
+        key=lambda item: (
+            sum(int(x) for x in item["finalScore"].split("-")),
+            sum(int(x) for x in item["halfTimeScore"].split("-")),
+            item["finalScore"]
         )
+    )
 
-        ft_result = streak(
-            total_values(history, "finalScore")
-        )
-
-        if ht_result:
-            ht_candidates.append(ht_result["expected"])
-
-        if ft_result:
-            ft_candidates.append(ft_result["expected"])
-
-    if ht_candidates and len(set(ht_candidates)) == 1:
-        expectations["İY"] = ht_candidates[0]
-
-    if ft_candidates and len(set(ft_candidates)) == 1:
-        expectations["MS"] = ft_candidates[0]
-
-    # Takimlarin kendi gol beklentileri
-    for key, history, field in (
-        ("İY EV", home_history, "teamGoalsHT"),
-        ("İY DEP", away_history, "teamGoalsHT"),
-        ("MS EV", home_history, "teamGoalsFT"),
-        ("MS DEP", away_history, "teamGoalsFT")
-    ):
-
-        result = streak(
-            own_values(history, field)
-        )
-
-        if result:
-            expectations[key] = result["expected"]
-
-    return expectations
+    return scenarios[:limit]
 
 
 # ============================================================
@@ -657,10 +795,13 @@ def analyze_match(match):
     # BEKLENTILER VE OZEL SERILER
     # --------------------------------------------------------
 
-    expectations = build_expectations(
+    expectations, expectation_details = build_expectations(
         home_history,
-        away_history
+        away_history,
+        ref_history
     )
+
+    score_scenarios = generate_score_scenarios(expectations)
 
     special = collect_special_series(
         home_history,
@@ -670,6 +811,8 @@ def analyze_match(match):
     return {
         "signals": signals,
         "expectations": expectations,
+        "expectationDetails": expectation_details,
+        "scoreScenarios": score_scenarios,
         "specialSeries": special,
         "dataQuality": {
             "homeHistory": len(home_history),
@@ -729,8 +872,12 @@ def main():
         signals = analysis["signals"]
         special = analysis["specialSeries"]
 
-        # Sinyal veya ozel seri bulunmayan maci analiz listesine alma.
-        if not signals and not special:
+        # Beklenti, sinyal veya özel seri bulunan maçları listeye al.
+        has_expectation = any(
+            value != "DEĞİŞKEN"
+            for value in analysis["expectations"].values()
+        )
+        if not signals and not special and not has_expectation:
             continue
 
         results.append({
@@ -744,6 +891,8 @@ def main():
             "halfTimeScore": match.get("halfTimeScore"),
             "finalScore": match.get("finalScore"),
             "expectations": analysis["expectations"],
+            "expectationDetails": analysis["expectationDetails"],
+            "scoreScenarios": analysis["scoreScenarios"],
             "signals": signals,
             "specialSeries": special,
             "signalCount": len(signals) + len(special),
@@ -771,6 +920,8 @@ def main():
             "note": (
                 "Seri kirilma beklentisi kesin tahmin degildir. "
                 "Oruntu, gecmis kayitlarda gozlenen siralamadir. "
+                "Kaynaklar ayrı değerlendirilir; uzun seriler daha ağır ağırlık alır. "
+                "Olası skorlar yalnızca beklentilerle uyumlu senaryolardır. "
                 "Yeterli veri yoksa beklenti DEĞİŞKEN kalir. "
                 "Bu cikti garanti veya bahis tavsiyesi degildir."
             )
