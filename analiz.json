@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-28T13:16:49.399800+00:00",
+  "generatedAt": "2026-11-28T13:38:15.333149+00:00",
   "source": "SportStatsAPI",
   "method": {
     "minimumStreak": 4,
@@ -7,20 +7,24 @@
     "minimumSpecialStreak": 6,
     "ruleCount": 12,
     "scorePickCount": 6,
+    "systemPredictionGroups": 3,
+    "systemPicksPerGroup": 3,
+    "systemPredictionMaximum": 9,
     "note": "Dönüşümlü ve ikili blok örüntülerinde beklenen sonuç, örüntünün devamı değil bozulma senaryosudur. Çelişkili beklentilerde skor üretimi tamamen durdurulmaz; uzlaştırılmış alternatifler ayrı etiketlenir. Skor destek puanları gerçek olasılık değildir. Bu çıktı garanti veya bahis tavsiyesi değildir."
   },
   "summary": {
     "sourceMatches": 2900,
     "finishedMatches": 2438,
-    "upcomingMatches": 445,
-    "matchesWithSignals": 445,
-    "totalSignals": 898,
-    "systemPredictionCount": 12
+    "upcomingMatches": 444,
+    "matchesWithSignals": 444,
+    "totalSignals": 897,
+    "systemPredictionCount": 9
   },
   "systemPredictions": {
     "date": "2026-11-28",
-    "targetCount": 12,
-    "selectedCount": 12,
+    "targetCount": 9,
+    "groupsOf": 3,
+    "selectedCount": 9,
     "groupCount": 3,
     "groups": [
       {
@@ -40,34 +44,16 @@
             "selectionScore": 50.4,
             "fixedMarketCount": 4,
             "signalCount": 6,
+            "seriesCount": 4,
+            "patternCount": 2,
+            "maxSeriesLength": 7,
             "goalSampleCounts": {
               "homeScored": 5,
               "homeConceded": 5,
               "awayScored": 5,
               "awayConceded": 5
             },
-            "reason": "6 sinyal, 4/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
-          },
-          {
-            "id": "m9h3a",
-            "date": "2026-11-28T15:00:00Z",
-            "country": "Yunanistan",
-            "league": "Super League",
-            "home": "Iraklis 1908",
-            "away": "Panetolikos",
-            "halfTimeScore": "0-0",
-            "finalScore": "1-1",
-            "scoreSource": "UZLAŞTIRILMIŞ ALTERNATİF",
-            "selectionScore": 53.7,
-            "fixedMarketCount": 5,
-            "signalCount": 5,
-            "goalSampleCounts": {
-              "homeScored": 4,
-              "homeConceded": 4,
-              "awayScored": 5,
-              "awayConceded": 5
-            },
-            "reason": "5 sinyal, 5/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
+            "reason": "6 sinyal; en uzun seri 7; 4 seri, 2 örüntü; 4/6 kesin pazar ve veri kalitesi değerlendirildi."
           },
           {
             "id": "m8xbo",
@@ -82,34 +68,40 @@
             "selectionScore": 52.5,
             "fixedMarketCount": 5,
             "signalCount": 5,
+            "seriesCount": 3,
+            "patternCount": 2,
+            "maxSeriesLength": 11,
             "goalSampleCounts": {
               "homeScored": 5,
               "homeConceded": 5,
               "awayScored": 5,
               "awayConceded": 5
             },
-            "reason": "5 sinyal, 5/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
+            "reason": "5 sinyal; en uzun seri 11; 3 seri, 2 örüntü; 5/6 kesin pazar ve veri kalitesi değerlendirildi."
           },
           {
-            "id": "m8zds",
-            "date": "2026-11-28T17:45:00Z",
-            "country": "İskoçya",
-            "league": "Premiership",
-            "home": "Motherwell",
-            "away": "Hibernian",
-            "halfTimeScore": "0-1",
-            "finalScore": "0-1",
+            "id": "m9h3a",
+            "date": "2026-11-28T15:00:00Z",
+            "country": "Yunanistan",
+            "league": "Super League",
+            "home": "Iraklis 1908",
+            "away": "Panetolikos",
+            "halfTimeScore": "0-0",
+            "finalScore": "1-1",
             "scoreSource": "UZLAŞTIRILMIŞ ALTERNATİF",
-            "selectionScore": 58.8,
-            "fixedMarketCount": 6,
-            "signalCount": 4,
+            "selectionScore": 53.7,
+            "fixedMarketCount": 5,
+            "signalCount": 5,
+            "seriesCount": 2,
+            "patternCount": 3,
+            "maxSeriesLength": 9,
             "goalSampleCounts": {
-              "homeScored": 6,
-              "homeConceded": 6,
+              "homeScored": 4,
+              "homeConceded": 4,
               "awayScored": 5,
               "awayConceded": 5
             },
-            "reason": "4 sinyal, 6/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
+            "reason": "5 sinyal; en uzun seri 9; 2 seri, 3 örüntü; 5/6 kesin pazar ve veri kalitesi değerlendirildi."
           }
         ]
       },
@@ -130,34 +122,16 @@
             "selectionScore": 57.7,
             "fixedMarketCount": 6,
             "signalCount": 4,
+            "seriesCount": 4,
+            "patternCount": 0,
+            "maxSeriesLength": 12,
             "goalSampleCounts": {
               "homeScored": 6,
               "homeConceded": 6,
               "awayScored": 5,
               "awayConceded": 5
             },
-            "reason": "4 sinyal, 6/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
-          },
-          {
-            "id": "m92mf",
-            "date": "2026-11-28T15:00:00Z",
-            "country": "İngiltere",
-            "league": "Championship",
-            "home": "Wrexham",
-            "away": "Portsmouth",
-            "halfTimeScore": "0-1",
-            "finalScore": "1-2",
-            "scoreSource": "ANA SİSTEM",
-            "selectionScore": 55.5,
-            "fixedMarketCount": 5,
-            "signalCount": 4,
-            "goalSampleCounts": {
-              "homeScored": 6,
-              "homeConceded": 6,
-              "awayScored": 6,
-              "awayConceded": 6
-            },
-            "reason": "4 sinyal, 5/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
+            "reason": "4 sinyal; en uzun seri 12; 4 seri, 0 örüntü; 6/6 kesin pazar ve veri kalitesi değerlendirildi."
           },
           {
             "id": "m98ct",
@@ -172,41 +146,17 @@
             "selectionScore": 55.4,
             "fixedMarketCount": 5,
             "signalCount": 4,
+            "seriesCount": 2,
+            "patternCount": 2,
+            "maxSeriesLength": 6,
             "goalSampleCounts": {
               "homeScored": 4,
               "homeConceded": 4,
               "awayScored": 7,
               "awayConceded": 7
             },
-            "reason": "4 sinyal, 5/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
+            "reason": "4 sinyal; en uzun seri 6; 2 seri, 2 örüntü; 5/6 kesin pazar ve veri kalitesi değerlendirildi."
           },
-          {
-            "id": "m8xhv",
-            "date": "2026-11-28T16:15:00Z",
-            "country": "Fransa",
-            "league": "Ligue 1",
-            "home": "Angers",
-            "away": "Lens",
-            "halfTimeScore": "0-0",
-            "finalScore": "2-1",
-            "scoreSource": "UZLAŞTIRILMIŞ ALTERNATİF",
-            "selectionScore": 54.0,
-            "fixedMarketCount": 5,
-            "signalCount": 4,
-            "goalSampleCounts": {
-              "homeScored": 5,
-              "homeConceded": 5,
-              "awayScored": 6,
-              "awayConceded": 6
-            },
-            "reason": "4 sinyal, 5/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
-          }
-        ]
-      },
-      {
-        "group": 3,
-        "title": "Grup 3",
-        "matches": [
           {
             "id": "m8xbm",
             "date": "2026-11-28T20:00:00Z",
@@ -220,81 +170,99 @@
             "selectionScore": 51.2,
             "fixedMarketCount": 5,
             "signalCount": 4,
+            "seriesCount": 3,
+            "patternCount": 1,
+            "maxSeriesLength": 6,
             "goalSampleCounts": {
               "homeScored": 5,
               "homeConceded": 5,
               "awayScored": 5,
               "awayConceded": 5
             },
-            "reason": "4 sinyal, 5/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
-          },
+            "reason": "4 sinyal; en uzun seri 6; 3 seri, 1 örüntü; 5/6 kesin pazar ve veri kalitesi değerlendirildi."
+          }
+        ]
+      },
+      {
+        "group": 3,
+        "title": "Grup 3",
+        "matches": [
           {
-            "id": "m9le3",
-            "date": "2026-11-28T14:00:00Z",
-            "country": "İtalya",
-            "league": "Serie B",
-            "home": "Ascoli",
-            "away": "Entella",
-            "halfTimeScore": "1-0",
-            "finalScore": "1-1",
+            "id": "m8xhv",
+            "date": "2026-11-28T16:15:00Z",
+            "country": "Fransa",
+            "league": "Ligue 1",
+            "home": "Angers",
+            "away": "Lens",
+            "halfTimeScore": "0-0",
+            "finalScore": "2-1",
             "scoreSource": "UZLAŞTIRILMIŞ ALTERNATİF",
-            "selectionScore": 59.0,
-            "fixedMarketCount": 6,
-            "signalCount": 3,
-            "goalSampleCounts": {
-              "homeScored": 7,
-              "homeConceded": 7,
-              "awayScored": 5,
-              "awayConceded": 5
-            },
-            "reason": "3 sinyal, 6/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
-          },
-          {
-            "id": "m954q",
-            "date": "2026-11-28T17:30:00Z",
-            "country": "İspanya",
-            "league": "LaLiga",
-            "home": "Elche",
-            "away": "Atl. Madrid",
-            "halfTimeScore": "0-1",
-            "finalScore": "0-2",
-            "scoreSource": "UZLAŞTIRILMIŞ ALTERNATİF",
-            "selectionScore": 56.1,
-            "fixedMarketCount": 6,
-            "signalCount": 3,
-            "goalSampleCounts": {
-              "homeScored": 5,
-              "homeConceded": 5,
-              "awayScored": 5,
-              "awayConceded": 5
-            },
-            "reason": "3 sinyal, 6/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
-          },
-          {
-            "id": "m92m8",
-            "date": "2026-11-28T15:00:00Z",
-            "country": "İngiltere",
-            "league": "Championship",
-            "home": "Millwall",
-            "away": "Burnley",
-            "halfTimeScore": "1-1",
-            "finalScore": "1-1",
-            "scoreSource": "UZLAŞTIRILMIŞ ALTERNATİF",
-            "selectionScore": 52.8,
+            "selectionScore": 54.0,
             "fixedMarketCount": 5,
-            "signalCount": 3,
+            "signalCount": 4,
+            "seriesCount": 3,
+            "patternCount": 1,
+            "maxSeriesLength": 5,
             "goalSampleCounts": {
               "homeScored": 5,
               "homeConceded": 5,
               "awayScored": 6,
               "awayConceded": 6
             },
-            "reason": "3 sinyal, 5/6 kesin pazar, gol verisi yeterliliği ve kaynak uzlaşması birlikte değerlendirildi."
+            "reason": "4 sinyal; en uzun seri 5; 3 seri, 1 örüntü; 5/6 kesin pazar ve veri kalitesi değerlendirildi."
+          },
+          {
+            "id": "m8zds",
+            "date": "2026-11-28T17:45:00Z",
+            "country": "İskoçya",
+            "league": "Premiership",
+            "home": "Motherwell",
+            "away": "Hibernian",
+            "halfTimeScore": "0-1",
+            "finalScore": "0-1",
+            "scoreSource": "UZLAŞTIRILMIŞ ALTERNATİF",
+            "selectionScore": 58.8,
+            "fixedMarketCount": 6,
+            "signalCount": 4,
+            "seriesCount": 3,
+            "patternCount": 1,
+            "maxSeriesLength": 4,
+            "goalSampleCounts": {
+              "homeScored": 6,
+              "homeConceded": 6,
+              "awayScored": 5,
+              "awayConceded": 5
+            },
+            "reason": "4 sinyal; en uzun seri 4; 3 seri, 1 örüntü; 6/6 kesin pazar ve veri kalitesi değerlendirildi."
+          },
+          {
+            "id": "m92mf",
+            "date": "2026-11-28T15:00:00Z",
+            "country": "İngiltere",
+            "league": "Championship",
+            "home": "Wrexham",
+            "away": "Portsmouth",
+            "halfTimeScore": "0-1",
+            "finalScore": "1-2",
+            "scoreSource": "ANA SİSTEM",
+            "selectionScore": 55.5,
+            "fixedMarketCount": 5,
+            "signalCount": 4,
+            "seriesCount": 2,
+            "patternCount": 2,
+            "maxSeriesLength": 4,
+            "goalSampleCounts": {
+              "homeScored": 6,
+              "homeConceded": 6,
+              "awayScored": 6,
+              "awayConceded": 6
+            },
+            "reason": "4 sinyal; en uzun seri 4; 2 seri, 2 örüntü; 5/6 kesin pazar ve veri kalitesi değerlendirildi."
           }
         ]
       }
     ],
-    "note": "Sistem tahminleri sinyal sayısı, veri kapsamı ve beklenti tutarlılığına göre sıralanır. Seçim puanı gerçek olasılık değildir."
+    "note": "Sistem tahminleri önce toplam sinyal sayısına, eşitlikte en uzun seriye; ardından veri kapsamı ve beklenti tutarlılığına göre sıralanır. Her grupta en fazla 3 maç bulunur. Seçim puanı gerçek olasılık değildir."
   },
   "matches": [
     {
@@ -296232,789 +296200,6 @@
       "goalDataQuality": {
         "homeScored": 5,
         "homeConceded": 5,
-        "awayScored": 5,
-        "awayConceded": 5
-      }
-    },
-    {
-      "id": "m91k5",
-      "date": "2026-11-28T13:30:00Z",
-      "country": "Rusya",
-      "league": "Premier League",
-      "home": "CSKA Moscow",
-      "away": "Zenit",
-      "referee": "",
-      "halfTimeScore": "",
-      "finalScore": "",
-      "expectations": {
-        "İY": "DEĞİŞKEN",
-        "İY EV": "TEK",
-        "İY DEP": "TEK",
-        "MS": "DEĞİŞKEN",
-        "MS EV": "DEĞİŞKEN",
-        "MS DEP": "TEK"
-      },
-      "expectationDetails": {
-        "İY": {
-          "decision": "DEĞİŞKEN",
-          "votes": {
-            "TEK": 0,
-            "ÇİFT": 0
-          },
-          "groupVotes": {
-            "EV TAKIMI": {
-              "TEK": 0,
-              "ÇİFT": 0
-            },
-            "DEP TAKIMI": {
-              "TEK": 0,
-              "ÇİFT": 0
-            },
-            "HAKEM": {
-              "TEK": 0,
-              "ÇİFT": 0
-            }
-          },
-          "sources": [
-            {
-              "source": "EV TAKIMIN MAÇLARINDA TOPLAM İY GOL",
-              "group": "EV TAKIMI",
-              "sampleCount": 9,
-              "totalSampleCount": 9,
-              "oddCount": 3,
-              "evenCount": 6,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "TEK",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT"
-              ],
-              "summary": "Son 9 maçta 3 TEK, 6 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "DEP TAKIMIN MAÇLARINDA TOPLAM İY GOL",
-              "group": "DEP TAKIMI",
-              "sampleCount": 10,
-              "totalSampleCount": 10,
-              "oddCount": 6,
-              "evenCount": 4,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "ÇİFT",
-                "TEK",
-                "TEK",
-                "TEK",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "TEK",
-                "TEK",
-                "ÇİFT"
-              ],
-              "summary": "Son 10 maçta 6 TEK, 4 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "HAKEMİN MAÇLARINDA TOPLAM İY GOL",
-              "group": "HAKEM",
-              "sampleCount": 0,
-              "totalSampleCount": 0,
-              "expected": null,
-              "weight": 0,
-              "summary": "Bu kaynak için kullanılabilir geçmiş veri yok."
-            }
-          ],
-          "supportCount": 0,
-          "conflict": false
-        },
-        "İY EV": {
-          "decision": "TEK",
-          "votes": {
-            "TEK": 4,
-            "ÇİFT": 0
-          },
-          "groupVotes": {
-            "EV TAKIMI": {
-              "TEK": 4,
-              "ÇİFT": 0
-            },
-            "DEP TAKIMI": {
-              "TEK": 0,
-              "ÇİFT": 0
-            },
-            "HAKEM": {
-              "TEK": 0,
-              "ÇİFT": 0
-            }
-          },
-          "sources": [
-            {
-              "source": "EV TAKIMIN MAÇLARINDA EV SAHİBİ İY GOLLERİ",
-              "group": "EV TAKIMI",
-              "sampleCount": 9,
-              "totalSampleCount": 9,
-              "oddCount": 3,
-              "evenCount": 6,
-              "expected": "TEK",
-              "kind": "SERİ",
-              "length": 4,
-              "weight": 4,
-              "sequence": [
-                "ÇİFT",
-                "TEK",
-                "TEK",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT"
-              ],
-              "summary": "Son 4 maçta ÇİFT sonucu aralıksız oluştu. Serinin kırılma senaryosu TEK."
-            },
-            {
-              "source": "EV TAKIMIN KENDİ SAHASINDA ATTIĞI İY GOLLER",
-              "group": "EV TAKIMI",
-              "sampleCount": 4,
-              "totalSampleCount": 4,
-              "oddCount": 1,
-              "evenCount": 3,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT"
-              ],
-              "summary": "Son 4 maçta 1 TEK, 3 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "DEP TAKIMIN MAÇLARINDA EV SAHİBİ İY GOLLERİ",
-              "group": "DEP TAKIMI",
-              "sampleCount": 10,
-              "totalSampleCount": 10,
-              "oddCount": 2,
-              "evenCount": 8,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT"
-              ],
-              "summary": "Son 10 maçta 2 TEK, 8 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "DEP TAKIMIN DEPLASMANDA YEDİĞİ İY GOLLER",
-              "group": "DEP TAKIMI",
-              "sampleCount": 5,
-              "totalSampleCount": 5,
-              "oddCount": 1,
-              "evenCount": 4,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT"
-              ],
-              "summary": "Son 5 maçta 1 TEK, 4 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "HAKEMİN MAÇLARINDA EV SAHİBİ İY GOLLERİ",
-              "group": "HAKEM",
-              "sampleCount": 0,
-              "totalSampleCount": 0,
-              "expected": null,
-              "weight": 0,
-              "summary": "Bu kaynak için kullanılabilir geçmiş veri yok."
-            }
-          ],
-          "supportCount": 1,
-          "conflict": false
-        },
-        "İY DEP": {
-          "decision": "TEK",
-          "votes": {
-            "TEK": 4,
-            "ÇİFT": 0
-          },
-          "groupVotes": {
-            "EV TAKIMI": {
-              "TEK": 4,
-              "ÇİFT": 0
-            },
-            "DEP TAKIMI": {
-              "TEK": 0,
-              "ÇİFT": 0
-            },
-            "HAKEM": {
-              "TEK": 0,
-              "ÇİFT": 0
-            }
-          },
-          "sources": [
-            {
-              "source": "EV TAKIMIN MAÇLARINDA DEPLASMAN İY GOLLERİ",
-              "group": "EV TAKIMI",
-              "sampleCount": 9,
-              "totalSampleCount": 9,
-              "oddCount": 4,
-              "evenCount": 5,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "TEK",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT"
-              ],
-              "summary": "Son 9 maçta 4 TEK, 5 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "EV TAKIMIN KENDİ SAHASINDA YEDİĞİ İY GOLLER",
-              "group": "EV TAKIMI",
-              "sampleCount": 4,
-              "totalSampleCount": 4,
-              "oddCount": 0,
-              "evenCount": 4,
-              "expected": "TEK",
-              "kind": "SERİ",
-              "length": 4,
-              "weight": 4,
-              "sequence": [
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT"
-              ],
-              "summary": "Son 4 maçta ÇİFT sonucu aralıksız oluştu. Serinin kırılma senaryosu TEK."
-            },
-            {
-              "source": "DEP TAKIMIN MAÇLARINDA DEPLASMAN İY GOLLERİ",
-              "group": "DEP TAKIMI",
-              "sampleCount": 10,
-              "totalSampleCount": 10,
-              "oddCount": 4,
-              "evenCount": 6,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "ÇİFT",
-                "TEK",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT"
-              ],
-              "summary": "Son 10 maçta 4 TEK, 6 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "DEP TAKIMIN DEPLASMANDA ATTIĞI İY GOLLER",
-              "group": "DEP TAKIMI",
-              "sampleCount": 5,
-              "totalSampleCount": 5,
-              "oddCount": 1,
-              "evenCount": 4,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT"
-              ],
-              "summary": "Son 5 maçta 1 TEK, 4 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "HAKEMİN MAÇLARINDA DEPLASMAN İY GOLLERİ",
-              "group": "HAKEM",
-              "sampleCount": 0,
-              "totalSampleCount": 0,
-              "expected": null,
-              "weight": 0,
-              "summary": "Bu kaynak için kullanılabilir geçmiş veri yok."
-            }
-          ],
-          "supportCount": 1,
-          "conflict": false
-        },
-        "MS": {
-          "decision": "DEĞİŞKEN",
-          "votes": {
-            "TEK": 0,
-            "ÇİFT": 0
-          },
-          "groupVotes": {
-            "EV TAKIMI": {
-              "TEK": 0,
-              "ÇİFT": 0
-            },
-            "DEP TAKIMI": {
-              "TEK": 0,
-              "ÇİFT": 0
-            },
-            "HAKEM": {
-              "TEK": 0,
-              "ÇİFT": 0
-            }
-          },
-          "sources": [
-            {
-              "source": "EV TAKIMIN MAÇLARINDA TOPLAM MS GOL",
-              "group": "EV TAKIMI",
-              "sampleCount": 9,
-              "totalSampleCount": 9,
-              "oddCount": 3,
-              "evenCount": 6,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK"
-              ],
-              "summary": "Son 9 maçta 3 TEK, 6 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "DEP TAKIMIN MAÇLARINDA TOPLAM MS GOL",
-              "group": "DEP TAKIMI",
-              "sampleCount": 10,
-              "totalSampleCount": 10,
-              "oddCount": 7,
-              "evenCount": 3,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "TEK",
-                "TEK",
-                "TEK",
-                "TEK",
-                "TEK",
-                "TEK",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT"
-              ],
-              "summary": "Son 10 maçta 7 TEK, 3 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "HAKEMİN MAÇLARINDA TOPLAM MS GOL",
-              "group": "HAKEM",
-              "sampleCount": 0,
-              "totalSampleCount": 0,
-              "expected": null,
-              "weight": 0,
-              "summary": "Bu kaynak için kullanılabilir geçmiş veri yok."
-            }
-          ],
-          "supportCount": 0,
-          "conflict": false
-        },
-        "MS EV": {
-          "decision": "DEĞİŞKEN",
-          "votes": {
-            "TEK": 0,
-            "ÇİFT": 0
-          },
-          "groupVotes": {
-            "EV TAKIMI": {
-              "TEK": 0,
-              "ÇİFT": 0
-            },
-            "DEP TAKIMI": {
-              "TEK": 0,
-              "ÇİFT": 0
-            },
-            "HAKEM": {
-              "TEK": 0,
-              "ÇİFT": 0
-            }
-          },
-          "sources": [
-            {
-              "source": "EV TAKIMIN MAÇLARINDA EV SAHİBİ MS GOLLERİ",
-              "group": "EV TAKIMI",
-              "sampleCount": 9,
-              "totalSampleCount": 9,
-              "oddCount": 6,
-              "evenCount": 3,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "TEK",
-                "TEK",
-                "TEK",
-                "TEK",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK"
-              ],
-              "summary": "Son 9 maçta 6 TEK, 3 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "EV TAKIMIN KENDİ SAHASINDA ATTIĞI MS GOLLER",
-              "group": "EV TAKIMI",
-              "sampleCount": 4,
-              "totalSampleCount": 4,
-              "oddCount": 3,
-              "evenCount": 1,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "TEK",
-                "TEK",
-                "ÇİFT",
-                "TEK"
-              ],
-              "summary": "Son 4 maçta 3 TEK, 1 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "DEP TAKIMIN MAÇLARINDA EV SAHİBİ MS GOLLERİ",
-              "group": "DEP TAKIMI",
-              "sampleCount": 10,
-              "totalSampleCount": 10,
-              "oddCount": 3,
-              "evenCount": 7,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK"
-              ],
-              "summary": "Son 10 maçta 3 TEK, 7 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "DEP TAKIMIN DEPLASMANDA YEDİĞİ MS GOLLER",
-              "group": "DEP TAKIMI",
-              "sampleCount": 5,
-              "totalSampleCount": 5,
-              "oddCount": 1,
-              "evenCount": 4,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK"
-              ],
-              "summary": "Son 5 maçta 1 TEK, 4 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "HAKEMİN MAÇLARINDA EV SAHİBİ MS GOLLERİ",
-              "group": "HAKEM",
-              "sampleCount": 0,
-              "totalSampleCount": 0,
-              "expected": null,
-              "weight": 0,
-              "summary": "Bu kaynak için kullanılabilir geçmiş veri yok."
-            }
-          ],
-          "supportCount": 0,
-          "conflict": false
-        },
-        "MS DEP": {
-          "decision": "TEK",
-          "votes": {
-            "TEK": 8,
-            "ÇİFT": 5
-          },
-          "groupVotes": {
-            "EV TAKIMI": {
-              "TEK": 4,
-              "ÇİFT": 0
-            },
-            "DEP TAKIMI": {
-              "TEK": 4,
-              "ÇİFT": 5
-            },
-            "HAKEM": {
-              "TEK": 0,
-              "ÇİFT": 0
-            }
-          },
-          "sources": [
-            {
-              "source": "EV TAKIMIN MAÇLARINDA DEPLASMAN MS GOLLERİ",
-              "group": "EV TAKIMI",
-              "sampleCount": 9,
-              "totalSampleCount": 9,
-              "oddCount": 3,
-              "evenCount": 6,
-              "expected": "TEK",
-              "kind": "SERİ",
-              "length": 4,
-              "weight": 4,
-              "sequence": [
-                "ÇİFT",
-                "TEK",
-                "TEK",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT"
-              ],
-              "summary": "Son 4 maçta ÇİFT sonucu aralıksız oluştu. Serinin kırılma senaryosu TEK."
-            },
-            {
-              "source": "EV TAKIMIN KENDİ SAHASINDA YEDİĞİ MS GOLLER",
-              "group": "EV TAKIMI",
-              "sampleCount": 4,
-              "totalSampleCount": 4,
-              "oddCount": 1,
-              "evenCount": 3,
-              "expected": null,
-              "kind": null,
-              "length": 0,
-              "weight": 0,
-              "sequence": [
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "ÇİFT"
-              ],
-              "summary": "Son 4 maçta 1 TEK, 3 ÇİFT sonuç var; yeterli seri veya örüntü yok."
-            },
-            {
-              "source": "DEP TAKIMIN MAÇLARINDA DEPLASMAN MS GOLLERİ",
-              "group": "DEP TAKIMI",
-              "sampleCount": 10,
-              "totalSampleCount": 10,
-              "oddCount": 6,
-              "evenCount": 4,
-              "expected": "TEK",
-              "kind": "ÖRÜNTÜ",
-              "length": 4,
-              "weight": 4,
-              "sequence": [
-                "TEK",
-                "ÇİFT",
-                "TEK",
-                "TEK",
-                "TEK",
-                "ÇİFT",
-                "ÇİFT",
-                "TEK",
-                "ÇİFT",
-                "TEK"
-              ],
-              "summary": "4 maçtır süren dönüşümlü örüntüsünün bozulma senaryosu TEK."
-            },
-            {
-              "source": "DEP TAKIMIN DEPLASMANDA ATTIĞI MS GOLLER",
-              "group": "DEP TAKIMI",
-              "sampleCount": 5,
-              "totalSampleCount": 5,
-              "oddCount": 5,
-              "evenCount": 0,
-              "expected": "ÇİFT",
-              "kind": "SERİ",
-              "length": 5,
-              "weight": 5,
-              "sequence": [
-                "TEK",
-                "TEK",
-                "TEK",
-                "TEK",
-                "TEK"
-              ],
-              "summary": "Son 5 maçta TEK sonucu aralıksız oluştu. Serinin kırılma senaryosu ÇİFT."
-            },
-            {
-              "source": "HAKEMİN MAÇLARINDA DEPLASMAN MS GOLLERİ",
-              "group": "HAKEM",
-              "sampleCount": 0,
-              "totalSampleCount": 0,
-              "expected": null,
-              "weight": 0,
-              "summary": "Bu kaynak için kullanılabilir geçmiş veri yok."
-            }
-          ],
-          "supportCount": 1,
-          "conflict": true
-        }
-      },
-      "scoreScenarios": [
-        {
-          "halfTimeScore": "1-1",
-          "finalScore": "1-1",
-          "source": "ANA SİSTEM",
-          "matchedMarkets": 6,
-          "conflictingMarkets": [],
-          "rank": 1,
-          "supportScore": 33.2
-        },
-        {
-          "halfTimeScore": "1-1",
-          "finalScore": "2-1",
-          "source": "ANA SİSTEM",
-          "matchedMarkets": 6,
-          "conflictingMarkets": [],
-          "rank": 2,
-          "supportScore": 26.1
-        },
-        {
-          "halfTimeScore": "1-1",
-          "finalScore": "3-1",
-          "source": "ANA SİSTEM",
-          "matchedMarkets": 6,
-          "conflictingMarkets": [],
-          "rank": 3,
-          "supportScore": 13.7
-        },
-        {
-          "halfTimeScore": "1-1",
-          "finalScore": "1-3",
-          "source": "ANA SİSTEM",
-          "matchedMarkets": 6,
-          "conflictingMarkets": [],
-          "rank": 4,
-          "supportScore": 12.0
-        },
-        {
-          "halfTimeScore": "1-1",
-          "finalScore": "2-3",
-          "source": "ANA SİSTEM",
-          "matchedMarkets": 6,
-          "conflictingMarkets": [],
-          "rank": 5,
-          "supportScore": 9.5
-        },
-        {
-          "halfTimeScore": "1-1",
-          "finalScore": "4-1",
-          "source": "ANA SİSTEM",
-          "matchedMarkets": 6,
-          "conflictingMarkets": [],
-          "rank": 6,
-          "supportScore": 5.4
-        }
-      ],
-      "alternativeAnalysis": {
-        "available": true,
-        "fallbackUsed": false,
-        "reason": "Skorlar ana sistemin kesin beklentileriyle uyumlu.",
-        "homeExpectedGoals": 1.57,
-        "awayExpectedGoals": 1.48,
-        "homeSamples": 4,
-        "awaySamples": 5,
-        "sampleCounts": {
-          "homeScored": 4,
-          "homeConceded": 4,
-          "awayScored": 5,
-          "awayConceded": 5
-        },
-        "minimumSamples": 3
-      },
-      "signals": [
-        {
-          "ruleId": "B2_DEP",
-          "rule": "MS TAKIM GOLÜ (DEP)",
-          "kind": "ÖRÜNTÜ",
-          "length": 5,
-          "pattern": "DÖNÜŞÜMLÜ",
-          "sequence": [
-            "TEK",
-            "ÇİFT",
-            "TEK",
-            "ÇİFT",
-            "TEK"
-          ],
-          "expected": "TEK",
-          "explanation": "5 maçtır devam eden dönüşümlü örüntüsü: TEK - ÇİFT - TEK - ÇİFT - TEK. Bozulma senaryosu TEK."
-        }
-      ],
-      "specialSeries": [],
-      "signalCount": 1,
-      "seriesCount": 0,
-      "patternCount": 1,
-      "maxSeriesLength": 0,
-      "maxPatternLength": 5,
-      "summary": "1 sinyal tespit edildi. 0 seri ve 1 örüntü bulgusu var. En güçlü skor senaryosu İY 1-1 / MS 1-1.",
-      "dataQuality": {
-        "homeHistory": 9,
-        "awayHistory": 10,
-        "refereeHistory": 0
-      },
-      "goalDataQuality": {
-        "homeScored": 4,
-        "homeConceded": 4,
         "awayScored": 5,
         "awayConceded": 5
       }
