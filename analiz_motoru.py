@@ -358,37 +358,166 @@ def prediction_for_values(values):
     return None
 
 
-def build_expectations(home_history, away_history, ref_history):
+def venue_own_values(history, team_name, venue, field):
+    """
+    Takımın yalnızca kendi belirlenen saha koşulundaki attığı/yediği gol.
+    home/away alanları karşılaşmadaki takım adlarıdır.
+    """
+    values = []
+
+    for item in ordered(history):
+        if venue == "home" and item.get("home") != team_name:
+            continue
+        if venue == "away" and item.get("away") != team_name:
+            continue
+
+        value = item.get(field)
+
+        if value is not None:
+            values.append(parity(value))
+
+    return values
+
+
+def source_observation(source_name, values, group):
+    """
+    Her kaynağın maç sayısını, TEK/ÇİFT dağılımını ve varsa
+    kırılma beklentisini açıklayan özetini üretir.
+    """
+    if not values:
+        return {
+            "source": source_name,
+            "group": group,
+            "sampleCount": 0,
+            "expected": None,
+            "weight": 0,
+            "summary": "Bu kaynak için kullanılabilir geçmiş veri yok."
+        }
+
+    recent = values[-HISTORY_LIMIT:]
+    odd_count = recent.count("TEK")
+    even_count = recent.count("ÇİFT")
+    prediction = prediction_for_values(recent)
+
+    if prediction:
+        expected = prediction["expected"]
+        length = prediction["length"]
+
+        if prediction["kind"] == "SERİ":
+            summary = (
+                f"Son {length} maçın tamamında {prediction['last']} "
+                f"sonucu oluştu. Serinin kırılması yönünde "
+                f"{expected} beklentisi var."
+            )
+        else:
+            summary = (
+                f"Son dört maçta {sequence_text(prediction['sequence'])} "
+                f"örüntüsü görüldü. Sonraki sonuç için "
+                f"{expected} beklentisi var."
+            )
+
+        weight = prediction["weight"]
+    else:
+        expected = None
+        weight = 0
+        summary = (
+            f"Son {len(recent)} maçta {odd_count} TEK, "
+            f"{even_count} ÇİFT sonuç var; yeterli seri veya örüntü yok."
+        )
+
+    return {
+        "source": source_name,
+        "group": group,
+        "sampleCount": len(recent),
+        "oddCount": odd_count,
+        "evenCount": even_count,
+        "expected": expected,
+        "kind": prediction["kind"] if prediction else None,
+        "length": prediction["length"] if prediction else 0,
+        "weight": weight,
+        "sequence": recent[-MAX_SEQUENCE_DISPLAY:],
+        "summary": summary
+    }
+
+
+def build_expectations(
+    home_history,
+    away_history,
+    ref_history,
+    home_team_name,
+    away_team_name
+):
+    """
+    Takımların oynadığı maçlardaki ev sahibi/deplasman gol yönlerini,
+    takımların kendi saha performanslarını ve hakem geçmişini inceler.
+
+    Aynı takımın ilişkili kaynakları ayrı gösterilir; oy ağırlığı takım
+    grubu başına sınırlandırılır, böylece aynı maçlar mükerrer oy olmaz.
+    """
     markets = {
         "İY": [
-            ("EV TAKIM GEÇMİŞİ", total_values(home_history, "halfTimeScore")),
-            ("DEP TAKIM GEÇMİŞİ", total_values(away_history, "halfTimeScore")),
-            ("HAKEM GEÇMİŞİ", total_values(ref_history, "halfTimeScore"))
+            ("EV TAKIMIN MAÇLARINDA TOPLAM İY GOL", "EV TAKIMI",
+             total_values(home_history, "halfTimeScore")),
+            ("DEP TAKIMIN MAÇLARINDA TOPLAM İY GOL", "DEP TAKIMI",
+             total_values(away_history, "halfTimeScore")),
+            ("HAKEMİN MAÇLARINDA TOPLAM İY GOL", "HAKEM",
+             total_values(ref_history, "halfTimeScore"))
         ],
         "İY EV": [
-            ("EVİN ATTIĞI İY GOL", own_values(home_history, "teamGoalsHT")),
-            ("DEP'İN YEDİRDİĞİ İY GOL", own_values(away_history, "opponentGoalsHT")),
-            ("HAKEM EV İY GOL", side_values(ref_history, "halfTimeScore", "home"))
+            ("EV TAKIMIN MAÇLARINDA EV SAHİBİ İY GOLLERİ", "EV TAKIMI",
+             side_values(home_history, "halfTimeScore", "home")),
+            ("EV TAKIMIN KENDİ SAHASINDA ATTIĞI İY GOLLER", "EV TAKIMI",
+             venue_own_values(home_history, home_team_name, "home", "teamGoalsHT")),
+            ("DEP TAKIMIN MAÇLARINDA EV SAHİBİ İY GOLLERİ", "DEP TAKIMI",
+             side_values(away_history, "halfTimeScore", "home")),
+            ("DEP TAKIMIN DEPLASMANDA YEDİĞİ İY GOLLER", "DEP TAKIMI",
+             venue_own_values(away_history, away_team_name, "away", "opponentGoalsHT")),
+            ("HAKEMİN MAÇLARINDA EV SAHİBİ İY GOLLERİ", "HAKEM",
+             side_values(ref_history, "halfTimeScore", "home"))
         ],
         "İY DEP": [
-            ("DEP'İN ATTIĞI İY GOL", own_values(away_history, "teamGoalsHT")),
-            ("EVİN YEDİRDİĞİ İY GOL", own_values(home_history, "opponentGoalsHT")),
-            ("HAKEM DEP İY GOL", side_values(ref_history, "halfTimeScore", "away"))
+            ("EV TAKIMIN MAÇLARINDA DEPLASMAN İY GOLLERİ", "EV TAKIMI",
+             side_values(home_history, "halfTimeScore", "away")),
+            ("EV TAKIMIN KENDİ SAHASINDA YEDİĞİ İY GOLLER", "EV TAKIMI",
+             venue_own_values(home_history, home_team_name, "home", "opponentGoalsHT")),
+            ("DEP TAKIMIN MAÇLARINDA DEPLASMAN İY GOLLERİ", "DEP TAKIMI",
+             side_values(away_history, "halfTimeScore", "away")),
+            ("DEP TAKIMIN DEPLASMANDA ATTIĞI İY GOLLER", "DEP TAKIMI",
+             venue_own_values(away_history, away_team_name, "away", "teamGoalsHT")),
+            ("HAKEMİN MAÇLARINDA DEPLASMAN İY GOLLERİ", "HAKEM",
+             side_values(ref_history, "halfTimeScore", "away"))
         ],
         "MS": [
-            ("EV TAKIM GEÇMİŞİ", total_values(home_history, "finalScore")),
-            ("DEP TAKIM GEÇMİŞİ", total_values(away_history, "finalScore")),
-            ("HAKEM GEÇMİŞİ", total_values(ref_history, "finalScore"))
+            ("EV TAKIMIN MAÇLARINDA TOPLAM MS GOL", "EV TAKIMI",
+             total_values(home_history, "finalScore")),
+            ("DEP TAKIMIN MAÇLARINDA TOPLAM MS GOL", "DEP TAKIMI",
+             total_values(away_history, "finalScore")),
+            ("HAKEMİN MAÇLARINDA TOPLAM MS GOL", "HAKEM",
+             total_values(ref_history, "finalScore"))
         ],
         "MS EV": [
-            ("EVİN ATTIĞI MS GOL", own_values(home_history, "teamGoalsFT")),
-            ("DEP'İN YEDİRDİĞİ MS GOL", own_values(away_history, "opponentGoalsFT")),
-            ("HAKEM EV MS GOL", side_values(ref_history, "finalScore", "home"))
+            ("EV TAKIMIN MAÇLARINDA EV SAHİBİ MS GOLLERİ", "EV TAKIMI",
+             side_values(home_history, "finalScore", "home")),
+            ("EV TAKIMIN KENDİ SAHASINDA ATTIĞI MS GOLLER", "EV TAKIMI",
+             venue_own_values(home_history, home_team_name, "home", "teamGoalsFT")),
+            ("DEP TAKIMIN MAÇLARINDA EV SAHİBİ MS GOLLERİ", "DEP TAKIMI",
+             side_values(away_history, "finalScore", "home")),
+            ("DEP TAKIMIN DEPLASMANDA YEDİĞİ MS GOLLER", "DEP TAKIMI",
+             venue_own_values(away_history, away_team_name, "away", "opponentGoalsFT")),
+            ("HAKEMİN MAÇLARINDA EV SAHİBİ MS GOLLERİ", "HAKEM",
+             side_values(ref_history, "finalScore", "home"))
         ],
         "MS DEP": [
-            ("DEP'İN ATTIĞI MS GOL", own_values(away_history, "teamGoalsFT")),
-            ("EVİN YEDİRDİĞİ MS GOL", own_values(home_history, "opponentGoalsFT")),
-            ("HAKEM DEP MS GOL", side_values(ref_history, "finalScore", "away"))
+            ("EV TAKIMIN MAÇLARINDA DEPLASMAN MS GOLLERİ", "EV TAKIMI",
+             side_values(home_history, "finalScore", "away")),
+            ("EV TAKIMIN KENDİ SAHASINDA YEDİĞİ MS GOLLER", "EV TAKIMI",
+             venue_own_values(home_history, home_team_name, "home", "opponentGoalsFT")),
+            ("DEP TAKIMIN MAÇLARINDA DEPLASMAN MS GOLLERİ", "DEP TAKIMI",
+             side_values(away_history, "finalScore", "away")),
+            ("DEP TAKIMIN DEPLASMANDA ATTIĞI MS GOLLER", "DEP TAKIMI",
+             venue_own_values(away_history, away_team_name, "away", "teamGoalsFT")),
+            ("HAKEMİN MAÇLARINDA DEPLASMAN MS GOLLERİ", "HAKEM",
+             side_values(ref_history, "finalScore", "away"))
         ]
     }
 
@@ -396,29 +525,28 @@ def build_expectations(home_history, away_history, ref_history):
     details = {}
 
     for market, sources in markets.items():
-        votes = {"TEK": 0, "ÇİFT": 0}
+        group_votes = {
+            "EV TAKIMI": {"TEK": 0, "ÇİFT": 0},
+            "DEP TAKIMI": {"TEK": 0, "ÇİFT": 0},
+            "HAKEM": {"TEK": 0, "ÇİFT": 0}
+        }
         source_details = []
 
-        for source_name, values in sources:
-            prediction = prediction_for_values(values)
+        for source_name, group, values in sources:
+            observation = source_observation(source_name, values, group)
+            source_details.append(observation)
 
-            if not prediction:
-                continue
+            expected = observation["expected"]
+            weight = observation["weight"]
 
-            expected = prediction["expected"]
-            weight = prediction["weight"]
-            votes[expected] += weight
+            if expected and weight > group_votes[group][expected]:
+                group_votes[group][expected] = weight
 
-            source_details.append({
-                "source": source_name,
-                "expected": expected,
-                "kind": prediction["kind"],
-                "length": prediction["length"],
-                "weight": weight,
-                "last": prediction.get("last"),
-                "sequence": prediction.get("sequence", []),
-                "pattern": prediction.get("pattern")
-            })
+        votes = {"TEK": 0, "ÇİFT": 0}
+
+        for group_vote in group_votes.values():
+            votes["TEK"] += group_vote["TEK"]
+            votes["ÇİFT"] += group_vote["ÇİFT"]
 
         if votes["TEK"] > votes["ÇİFT"]:
             decision = "TEK"
@@ -427,15 +555,23 @@ def build_expectations(home_history, away_history, ref_history):
         else:
             decision = "DEĞİŞKEN"
 
+        support_count = 0
+
+        if decision != "DEĞİŞKEN":
+            opposite = "ÇİFT" if decision == "TEK" else "TEK"
+            support_count = sum(
+                1 for group_vote in group_votes.values()
+                if group_vote[decision] > group_vote[opposite]
+                and group_vote[decision] > 0
+            )
+
         expectations[market] = decision
         details[market] = {
             "decision": decision,
             "votes": votes,
+            "groupVotes": group_votes,
             "sources": source_details,
-            "supportCount": sum(
-                1 for item in source_details
-                if item["expected"] == decision
-            ) if decision != "DEĞİŞKEN" else 0,
+            "supportCount": support_count,
             "conflict": votes["TEK"] > 0 and votes["ÇİFT"] > 0
         }
 
@@ -465,10 +601,6 @@ def score_matches_expectations(ht_home, ht_away, ft_home, ft_away, expectations)
 
 
 def generate_main_score_scenarios(expectations, limit=60):
-    """
-    Ana sistemin altı pazar beklentisine uyan skor çiftlerini üretir.
-    Burada favori veya alternatif analiz puanı kullanılmaz.
-    """
     scenarios = []
 
     for ht_home in range(5):
@@ -509,17 +641,16 @@ def average(values):
     return sum(clean) / len(clean)
 
 
-def team_goal_samples(history, side, field):
+def team_goal_samples(history, team_name, venue, field):
     """
-    Geçmiş takım kayıtlarında takımın kendi attığı/yediği golü döndürür.
-    Ev/deplasman ayrımı kayıtların home/away alanından yapılır.
+    home/away alanları takım adı tuttuğu için saha ayrımı takım adıyla yapılır.
     """
     values = []
 
     for item in ordered(history)[-HISTORY_LIMIT:]:
-        if side == "home" and item.get("home") is False:
+        if venue == "home" and item.get("home") != team_name:
             continue
-        if side == "away" and item.get("away") is False:
+        if venue == "away" and item.get("away") != team_name:
             continue
 
         value = item.get(field)
@@ -533,22 +664,15 @@ def team_goal_samples(history, side, field):
     return values
 
 
-def team_profile(history, venue):
-    """
-    Takımın attığı ve yediği gol ortalamalarını hesaplar.
-    Önce istenen saha türünü, veri yoksa genel geçmişi kullanır.
-    """
-    scored_field = "teamGoalsFT"
-    conceded_field = "opponentGoalsFT"
-
-    scored = team_goal_samples(history, venue, scored_field)
-    conceded = team_goal_samples(history, venue, conceded_field)
+def team_profile(history, team_name, venue):
+    scored = team_goal_samples(history, team_name, venue, "teamGoalsFT")
+    conceded = team_goal_samples(history, team_name, venue, "opponentGoalsFT")
 
     if len(scored) < 3:
-        scored = team_goal_samples(history, "all", scored_field)
+        scored = team_goal_samples(history, team_name, "all", "teamGoalsFT")
 
     if len(conceded) < 3:
-        conceded = team_goal_samples(history, "all", conceded_field)
+        conceded = team_goal_samples(history, team_name, "all", "opponentGoalsFT")
 
     return {
         "scored": average(scored),
@@ -558,35 +682,17 @@ def team_profile(history, venue):
     }
 
 
-def expected_goals(home_history, away_history):
-    """
-    Ev sahibi gol beklentisi:
-    ev sahibinin gol üretimi ve deplasmanın gol yeme verisi.
+def expected_goals(home_history, away_history, home_team_name, away_team_name):
+    home = team_profile(home_history, home_team_name, "home")
+    away = team_profile(away_history, away_team_name, "away")
 
-    Deplasman gol beklentisi:
-    deplasmanın gol üretimi ve ev sahibinin gol yeme verisi.
-    """
-    home = team_profile(home_history, "home")
-    away = team_profile(away_history, "away")
-
-    home_inputs = [
-        home["scored"],
-        away["conceded"]
-    ]
-    away_inputs = [
-        away["scored"],
-        home["conceded"]
-    ]
+    home_inputs = [home["scored"], away["conceded"]]
+    away_inputs = [away["scored"], home["conceded"]]
 
     home_inputs = [value for value in home_inputs if value is not None]
     away_inputs = [value for value in away_inputs if value is not None]
 
-    home_expected = average(home_inputs)
-    away_expected = average(away_inputs)
-
-    # Saha ayrımında yeterli veri yoksa genel takım ortalamasına
-    # düşülür; yine veri yoksa skor tahmini yapılmaz.
-    return home_expected, away_expected, home, away
+    return average(home_inputs), average(away_inputs), home, away
 
 
 def poisson_probability(goals, expected):
@@ -604,10 +710,6 @@ def poisson_probability(goals, expected):
 
 def score_data_strength(ht_home, ht_away, ft_home, ft_away,
                         expected_home, expected_away):
-    """
-    Skorun takım gol ortalamalarına göre göreli model desteği.
-    Gerçekleşme olasılığı değildir.
-    """
     if expected_home is None or expected_away is None:
         return 0.0
 
@@ -616,9 +718,6 @@ def score_data_strength(ht_home, ht_away, ft_home, ft_away,
         * poisson_probability(ft_away, expected_away)
     )
 
-    # İlk yarı skorunun, maç sonu skorundan daha düşük kalması
-    # doğal olarak kontrol edilir; yarı gol beklentisi yaklaşık
-    # maç sonu gol beklentisinin %45'i kabul edilir.
     ht_probability = (
         poisson_probability(ht_home, expected_home * 0.45)
         * poisson_probability(ht_away, expected_away * 0.45)
@@ -631,15 +730,15 @@ def generate_alternative_scores(
     expectations,
     home_history,
     away_history,
+    home_team_name,
+    away_team_name,
     excluded,
     limit=60
 ):
-    """
-    Ana sistem altı skor üretemediğinde kalan yerleri doldurur.
-    Ana sistemin net verdiği tek/çift kararları burada da zorunludur.
-    """
     expected_home, expected_away, home_profile, away_profile = (
-        expected_goals(home_history, away_history)
+        expected_goals(
+            home_history, away_history, home_team_name, away_team_name
+        )
     )
 
     if expected_home is None or expected_away is None:
@@ -716,12 +815,10 @@ def generate_alternative_scores(
 def build_six_score_picks(
     expectations,
     home_history,
-    away_history
+    away_history,
+    home_team_name,
+    away_team_name
 ):
-    """
-    Ana sistem skorları önceliklidir.
-    Altı skor tamamlanmazsa alternatif analiz kalan yerleri doldurur.
-    """
     main_scores = generate_main_score_scenarios(
         expectations,
         limit=60
@@ -729,11 +826,11 @@ def build_six_score_picks(
 
     expected_home, expected_away, _, _ = expected_goals(
         home_history,
-        away_history
+        away_history,
+        home_team_name,
+        away_team_name
     )
 
-    # Ana sistem skorlarının kendi iç sıralaması da takım gol
-    # verileriyle yapılır. Ana sistemin ürettiği skorlar korunur.
     if expected_home is not None and expected_away is not None:
         for item in main_scores:
             ht_home, ht_away = map(
@@ -769,13 +866,14 @@ def build_six_score_picks(
             expectations,
             home_history,
             away_history,
+            home_team_name,
+            away_team_name,
             used,
             limit=MAX_SCORE_PICKS - len(selected)
         )
 
         selected.extend(alternatives)
 
-    # Skorların göreli veri destek puanı.
     raw_values = [
         max(0.0, float(item.get("rawStrength", 0.0)))
         for item in selected
@@ -923,13 +1021,17 @@ def analyze_match(match):
     expectations, expectation_details = build_expectations(
         home_history,
         away_history,
-        ref_history
+        ref_history,
+        match.get("home"),
+        match.get("away")
     )
 
     score_picks, alternative_meta = build_six_score_picks(
         expectations,
         home_history,
-        away_history
+        away_history,
+        match.get("home"),
+        match.get("away")
     )
 
     special = collect_special_series(
