@@ -13,7 +13,7 @@ PATTERN_LENGTH = 4
 SPECIAL_STREAK = 6
 MAX_SEQUENCE_DISPLAY = 10
 MAX_SCORE_PICKS = 6
-HISTORY_LIMIT = 12
+RECENT_FORM_LIMIT = 12
 
 
 # ============================================================
@@ -381,23 +381,26 @@ def venue_own_values(history, team_name, venue, field):
 
 def source_observation(source_name, values, group):
     """
-    Her kaynağın maç sayısını, TEK/ÇİFT dağılımını ve varsa
-    kırılma beklentisini açıklayan özetini üretir.
+    Seri ve örüntü tüm geçmişten hesaplanır.
+    Dağılım ise yakın dönem formu için son 12 maçı kullanır.
     """
     if not values:
         return {
             "source": source_name,
             "group": group,
             "sampleCount": 0,
+            "totalSampleCount": 0,
             "expected": None,
             "weight": 0,
             "summary": "Bu kaynak için kullanılabilir geçmiş veri yok."
         }
 
-    recent = values[-HISTORY_LIMIT:]
+    recent = values[-RECENT_FORM_LIMIT:]
     odd_count = recent.count("TEK")
     even_count = recent.count("ÇİFT")
-    prediction = prediction_for_values(recent)
+
+    # Seri ve örüntü tüm mevcut geçmiş üzerinden hesaplanır.
+    prediction = prediction_for_values(values)
 
     if prediction:
         expected = prediction["expected"]
@@ -429,6 +432,7 @@ def source_observation(source_name, values, group):
         "source": source_name,
         "group": group,
         "sampleCount": len(recent),
+        "totalSampleCount": len(values),
         "oddCount": odd_count,
         "evenCount": even_count,
         "expected": expected,
@@ -647,7 +651,8 @@ def team_goal_samples(history, team_name, venue, field):
     """
     values = []
 
-    for item in ordered(history)[-HISTORY_LIMIT:]:
+    # Gol ortalamasi yakin donem formu icin son 12 macla sinirlidir.
+    for item in ordered(history)[-RECENT_FORM_LIMIT:]:
         if venue == "home" and item.get("home") != team_name:
             continue
         if venue == "away" and item.get("away") != team_name:
