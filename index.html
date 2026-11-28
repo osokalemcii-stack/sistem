@@ -265,6 +265,7 @@ function analysisDetails(match,cardKey){
  const expectations = analysis.expectations || {};
  const expectationDetails = analysis.expectationDetails || {};
  const scenarios = Array.isArray(analysis.scoreScenarios) ? analysis.scoreScenarios : [];
+ const alternative = analysis.alternativeAnalysis || {};
  const quality = analysis.dataQuality || {};
 
  const expectationRows = Object.entries(expectations).map(([key,value]) => {
@@ -280,37 +281,72 @@ function analysisDetails(match,cardKey){
     </div>
     <div class="data-quality">
      Ağırlıklı destek — TEK: ${safe(votes.TEK ?? 0)} · ÇİFT: ${safe(votes["ÇİFT"] ?? 0)}
+     · Destekleyen grup: ${safe(detail.supportCount ?? 0)}
      ${detail.conflict ? " · Kaynaklar çelişiyor" : ""}
     </div>
     ${sources.length ? sources.map(source => `
-     <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.08);font-size:12px">
-      <span>${safe(source.source)} · ${safe(source.kind)} (${safe(source.length)} maç)</span>
-      <b>${safe(source.expected)} · ağırlık ${safe(source.weight)}</b>
+     <div style="padding:8px 0;border-top:1px solid rgba(255,255,255,.08)">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:11px">
+       <b>${safe(source.source)}</b>
+       <span>${source.expected ? safe(source.expected) + " · ağırlık " + safe(source.weight) : "Net beklenti yok"}</span>
+      </div>
+      <div class="data-quality">
+       Örnek: ${safe(source.sampleCount ?? 0)} maç
+       · TEK: ${safe(source.oddCount ?? 0)}
+       · ÇİFT: ${safe(source.evenCount ?? 0)}
+       ${source.length ? " · Seri/örüntü: " + safe(source.length) : ""}
+      </div>
+      ${source.sequence ? sequenceHTML(source.sequence) : ""}
+      <div class="explanation">${safe(source.summary || "Açıklama bulunamadı.")}</div>
      </div>
-    `).join("") : '<div class="data-quality">Bu alan için yeterli seri/örüntü verisi yok.</div>'}
+    `).join("") : '<div class="data-quality">Bu alan için kaynak verisi bulunamadı.</div>'}
    </div>
   `;
  }).join("");
 
  return `
   <div class="history" id="${panelId}">
-   <h3 style="color:#9bcaff;font-size:12px">📊 ALTI ANA BEKLENTİ</h3>
+   <h3 style="color:#9bcaff;font-size:12px">📊 ALTI ANA BEKLENTİ VE KAYNAK ANALİZİ</h3>
    ${expectationRows || '<div class="empty">Beklenti verisi bulunamadı.</div>'}
 
-   <h3 style="color:#9bcaff;font-size:12px">🎯 BEKLENTİLERLE UYUMLU OLASI SKORLAR (${scenarios.length})</h3>
+   <h3 style="color:#9bcaff;font-size:12px">🎯 SKOR SENARYOLARI (${scenarios.length}/6)</h3>
    ${scenarios.length ? `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:8px">
      ${scenarios.map(item => `
       <div class="signal" style="text-align:center">
-       <div style="font-size:11px;color:#9bcaff">İY</div>
+       <div style="display:flex;justify-content:space-between;gap:5px;align-items:center;margin-bottom:8px">
+        <span class="pill ${item.source === "ANA SİSTEM" ? "green" : "gold"}">${safe(item.source || "KAYNAK BELİRSİZ")}</span>
+        <span class="data-quality">#${safe(item.rank ?? "-")}</span>
+       </div>
+       <div style="font-size:10px;color:#9bcaff">İLK YARI</div>
        <b style="font-size:17px">${safe(item.halfTimeScore)}</b>
-       <div style="font-size:11px;color:#9bcaff;margin-top:5px">MS</div>
+       <div style="font-size:10px;color:#9bcaff;margin-top:5px">MAÇ SONU</div>
        <b style="font-size:20px">${safe(item.finalScore)}</b>
+       <div style="margin-top:8px;color:#ffe2a1;font-size:11px;font-weight:bold">
+        Göreli destek: %${safe(item.supportScore ?? 0)}
+       </div>
       </div>
      `).join("")}
     </div>
-    <div class="data-quality">Skorlar yalnızca seçilen tek/çift beklentileriyle uyumlu senaryolardır; gerçekleşme olasılığı veya garanti anlamına gelmez.</div>
-   ` : '<div class="empty">Altı beklentinin tamamıyla uyumlu skor kombinasyonu bulunamadı. Beklentiler arasında matematiksel çelişki olabilir.</div>'}
+    <div class="data-quality">
+     Ana sistemin net TEK/ÇİFT kararları tüm skorlar için korunur.
+     Destek puanları gerçek gerçekleşme olasılığı değildir; listelenen skorlar
+     arasındaki göreli model desteğini gösterir.
+    </div>
+   ` : '<div class="empty">Yeterli veriyle skor senaryosu üretilemedi.</div>'}
+
+   ${alternative.reason ? `
+    <div class="data-quality" style="margin:8px 0">
+     <b>Alternatif analiz:</b> ${safe(alternative.reason)}
+    </div>
+   ` : alternative.available ? `
+    <div class="data-quality" style="margin:8px 0">
+     Alternatif model gol beklentileri — Ev sahibi: ${safe(alternative.homeExpectedGoals ?? "-")}
+     · Deplasman: ${safe(alternative.awayExpectedGoals ?? "-")}
+     <br>Örnek sayıları — Ev sahibi: ${safe(alternative.homeSamples ?? 0)}
+     · Deplasman: ${safe(alternative.awaySamples ?? 0)}
+    </div>
+   ` : ""}
 
    <h3 style="color:#9bcaff;font-size:12px">KURAL SİNYALLERİ (${signals.length})</h3>
    ${signals.length ? signals.map(signalHTML).join("") : '<div class="empty">Bu maçta kural sinyali yok.</div>'}
@@ -348,7 +384,6 @@ function card(match,sectionKey){
  const signalCount = matchSignalCount(match);
  const specialCount = allSpecial(match).length;
 
- // Her kartın bulunduğu bölüme özel, benzersiz kimlik.
  const cardKey = `${sectionKey}-${String(match.id).replace(/[^a-zA-Z0-9_-]/g,"_")}`;
  const analysisId = "analysis-" + cardKey;
  const historyId = "history-" + cardKey;
