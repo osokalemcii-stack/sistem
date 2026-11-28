@@ -9,8 +9,8 @@ from pathlib import Path
 
 # ============================================================
 # API-FOOTBALL V3 - 25 LIG BULTEN TOPLAYICI
-# Ucretsiz plan icin: season parametresi kullanmadan tarih bazli
-# fikstur sorgusu yapar. API key GitHub Secret'tan okunur.
+# GitHub Actions Secret: API_FOOTBALL_KEY
+# Season parametresi kullanilmaz; fiksturler tarih araligiyla cekilir.
 # ============================================================
 
 API_KEY = os.getenv("API_FOOTBALL_KEY")
@@ -24,9 +24,6 @@ ARCHIVE_FILE = Path("bulten_history.json")
 
 HISTORY_DAYS = 90
 FUTURE_DAYS = 14
-
-# 25 lig arama istegi + 1 tarih bazli fikstur istegi hedeflenir.
-# Pagination gerekirse ek istekler icin guvenlik siniri.
 MAX_API_CALLS = 90
 REQUEST_DELAY = 6.5
 
@@ -109,7 +106,7 @@ def api_get(endpoint, params=None):
     global api_call_count, last_request_time
 
     if api_call_count >= MAX_API_CALLS:
-        raise RuntimeError(f"GÃ¼venlik kotasÄ± doldu: {MAX_API_CALLS} istek.")
+        raise RuntimeError(f"API istek guvenlik siniri doldu: {MAX_API_CALLS}")
 
     elapsed = time.time() - last_request_time
     if last_request_time and elapsed < REQUEST_DELAY:
@@ -125,18 +122,35 @@ def api_get(endpoint, params=None):
 
     if response.status_code in (401, 403):
         raise RuntimeError(
-            f"API anahtarÄ±/yetki hatasÄ±: HTTP {response.status_code}"
+            f"API anahtari/yetki hatasi: HTTP {response.status_code}"
         )
     if response.status_code == 429:
-        raise RuntimeError("API hÄ±z veya gÃ¼nlÃ¼k kota sÄ±nÄ±rÄ±na ulaÅÄ±ldÄ±.")
+        raise RuntimeError("API hiz veya gunluk kota sinirina ulasildi.")
 
     response.raise_for_status()
     data = response.json()
 
     if data.get("errors"):
-        raise RuntimeError("API hata dÃ¶ndÃ¼rdÃ¼: " + str(data["errors"]))
+        raise RuntimeError("API hata dondurdu: " + str(data["errors"]))
 
     return data
+
+
+def find_league(items, config):
+    expected_names = {normalize(x) for x in config["names"]}
+    expected_country = normalize(config["country"])
+
+    for item in items:
+        league = item.get("league") or {}
+        country = item.get("country") or {}
+
+        # country parametresi API istegine eklenmez.
+        # Ulke ve lig adi eslestirmesi burada, Python tarafinda yapilir.
+        if normalize(country.get("name")) != expected_country:
+            continue
+        if normalize(league.get("name")) in expected_names:
+            return item
+    return None
 
 
 def parse_score(home, away):
@@ -149,155 +163,140 @@ def is_finished(status):
     return str(status or "").upper() in {"FT", "AET", "PEN"}
 
 
-def find_league(items, config):
-    expected_names = {normalize(x) for x in config["names"]}
-    expected_country = normalize(config["country"])
-
-    for item in items:
-        league = item.get("league") or {}
-        country = item.get("country") or {}
-        if normalize(country.get("name")) != expected_country:
-            continue
-        if normalize(league.get("name")) in expected_names:
-            return item
-    return None
-
-
 log("=" * 64)
-log("API-FOOTBALL TARIH BAZLI BULTEN TOPLAMA BASLADI")
-log("Sezon parametresi KULLANILMAYACAK.")
+log("API-FOOTBALL 25 LIG BULTEN TOPLAMA BASLADI")
+log("Lig aramasinda yalnizca search parametresi kullanilacak.")
+log("Fiksturlerde season parametresi kullanilmayacak.")
 log(f"Tarih araligi: {DATE_FROM} - {DATE_TO}")
 log("=" * 64)
 
-# Lig ID'lerini season parametresi olmadan bul.
+# 1) Lig ID'lerini bul. HATA DUZELTMESI:
+# /leagues isteginde search ve country birlikte gonderilmiyor.
 league_map = {}
 league_errors = []
 
 for index, config in enumerate(LEAGUES, start=1):
-    label = config["label"]
-    log(f"\n[{index}/{len(LEAGUES)}] {config['label_country']} - {label}")
-
+    log(f"\n[{index}/{len(LEAGUES)}] {config['label_country']} - {config['label']}")
     found = None
+
     for search_name in config["names"]:
         try:
-            payload = api_get(
-                "/leagues",
-                {"search": search_name, "country": config["country"]}
-            )
+            payload = api_get("/leagues", {"search": search_name})
             found = find_league(payload.get("response") or [], config)
             if found:
                 break
         except Exception as error:
-            league_errors.append(f"{label} lig aramasi: {error}")
-            log(f"  ARAMA UYARISI: {error}")
+            league_errors.append(f"{config['label']} lig aramasi: {error}")
+            log(f"  ARAMA HATASI: {error}")
             break
 
     if not found:
-        league_errors.append(f"{label}: API lig listesinde bulunamadi.")
+        league_errors.append(f"{config['label']}: lig bulunamadi.")
         log("  LIG BULUNAMADI - atlandi.")
         continue
 
     info = found.get("league") or {}
     league_id = info.get("id")
     if league_id is None:
-        league_errors.append(f"{label}: lig ID bulunamadi.")
+        league_errors.append(f"{config['label']}: lig ID bulunamadi.")
         log("  LIG ID YOK - atlandi.")
         continue
 
     league_map[int(league_id)] = config
-    log(f"  Bulundu: {info.get('name')} (ID: {league_id})")
+    log(f"  BULUNDU: {info.get('name')} (ID: {league_id})")
 
 if not league_map:
     raise SystemExit("HICBIR LIG BULUNAMADI. Mevcut bulten korunuyor.")
 
-# Kritik fark: /fixtures isteginde league ve season GONDERILMEZ.
-# Tarih araligi tum maclari getirir; yalnizca hedef ligler asagida filtrelenir.
-log("\nTarih araligindaki fiksturler cekiliyor (season/league filtresi yok)...")
-fixture_payload = api_get(
-    "/fixtures",
-    {
-        "from": DATE_FROM,
-        "to": DATE_TO,
-        "timezone": "Europe/Istanbul"
-    }
-)
-
-raw_fixtures = fixture_payload.get("response") or []
-paging = fixture_payload.get("paging") or {}
-total_pages = int(paging.get("total") or 1)
-
-# API yaniti sayfalanirsa kalan sayfalari al.
-for page in range(2, total_pages + 1):
-    page_payload = api_get(
-        "/fixtures",
-        {
-            "from": DATE_FROM,
-            "to": DATE_TO,
-            "timezone": "Europe/Istanbul",
-            "page": page
-        }
-    )
-    raw_fixtures.extend(page_payload.get("response") or [])
-
+# 2) Her ligin fiksturunu ayri cek.
+# Boylece tum dunyanin maclarini tek istekte cekip sayfalama sorunu yasamayiz.
 all_matches = []
 league_counts = {}
 
-for raw in raw_fixtures:
-    league_info = raw.get("league") or {}
-    league_id = league_info.get("id")
-    if league_id is None:
-        continue
+for index, (league_id, config) in enumerate(league_map.items(), start=1):
+    log(f"\nFikstur [{index}/{len(league_map)}]: {config['label']}")
+    page = 1
+    league_fixture_count = 0
 
-    config = league_map.get(int(league_id))
-    if not config:
-        continue
+    while True:
+        try:
+            params = {
+                "league": league_id,
+                "from": DATE_FROM,
+                "to": DATE_TO,
+                "timezone": "Europe/Istanbul",
+                "page": page
+            }
+            payload = api_get("/fixtures", params)
+        except Exception as error:
+            league_errors.append(f"{config['label']} fikstur hatasi: {error}")
+            log(f"  FIKSTUR HATASI: {error}")
+            break
 
-    fixture = raw.get("fixture") or {}
-    teams = raw.get("teams") or {}
-    goals = raw.get("goals") or {}
-    score = raw.get("score") or {}
-    halftime = score.get("halftime") or {}
-    home = teams.get("home") or {}
-    away = teams.get("away") or {}
+        fixtures = payload.get("response") or []
+        for raw in fixtures:
+            fixture = raw.get("fixture") or {}
+            teams = raw.get("teams") or {}
+            goals = raw.get("goals") or {}
+            score = raw.get("score") or {}
+            halftime = score.get("halftime") or {}
+            home = teams.get("home") or {}
+            away = teams.get("away") or {}
 
-    home_name = home.get("name") or ""
-    away_name = away.get("name") or ""
-    if not home_name or not away_name:
-        continue
+            home_name = home.get("name") or ""
+            away_name = away.get("name") or ""
+            if not home_name or not away_name:
+                continue
 
-    status = fixture.get("status") or {}
-    item = {
-        "id": str(fixture.get("id")),
-        "country": config["label_country"],
-        "league": config["label"],
-        "leagueCode": str(league_id),
-        "date": fixture.get("date") or "",
-        "home": home_name,
-        "away": away_name,
-        "referee": fixture.get("referee") or "",
-        "status": status.get("long") or "",
-        "statusCode": status.get("short") or "",
-        "finalScore": parse_score(goals.get("home"), goals.get("away")),
-        "halfTimeScore": parse_score(halftime.get("home"), halftime.get("away"))
-    }
-    all_matches.append(item)
-    league_counts[config["label"]] = league_counts.get(config["label"], 0) + 1
+            status = fixture.get("status") or {}
+            item = {
+                "id": str(fixture.get("id")),
+                "country": config["label_country"],
+                "league": config["label"],
+                "leagueCode": str(league_id),
+                "date": fixture.get("date") or "",
+                "home": home_name,
+                "away": away_name,
+                "referee": fixture.get("referee") or "",
+                "status": status.get("long") or "",
+                "statusCode": status.get("short") or "",
+                "finalScore": parse_score(goals.get("home"), goals.get("away")),
+                "halfTimeScore": parse_score(
+                    halftime.get("home"), halftime.get("away")
+                )
+            }
+            all_matches.append(item)
+            league_fixture_count += 1
 
-# AynÄ± maÃ§Ä±n tekrar yazÄ±lmasÄ±nÄ± engelle.
+        paging = payload.get("paging") or {}
+        total_pages = int(paging.get("total") or 1)
+        log(f"  Sayfa {page}/{total_pages}: {len(fixtures)} mac")
+
+        if page >= total_pages or not fixtures:
+            break
+        page += 1
+
+    if league_fixture_count:
+        league_counts[config["label"]] = league_fixture_count
+    log(f"  Toplam: {league_fixture_count} mac")
+
+# 3) Tekrar eden maclari temizle.
 unique = {}
 for match in all_matches:
-    if match.get("id") and match["id"] != "None":
-        unique[match["id"]] = match
+    match_id = match.get("id")
+    if match_id and match_id != "None":
+        unique[match_id] = match
+
 all_matches = list(unique.values())
 all_matches.sort(key=lambda x: x.get("date") or "")
 
 if not all_matches:
     raise SystemExit(
-        "Hedef 25 lig icin tarih araliginda mac bulunamadi. "
-        "Mevcut bulten korunuyor; bos dosya yazilmadi."
+        "Hedef liglerde tarih araliginda mac bulunamadi. "
+        "Mevcut JSON dosyalari korunuyor."
     )
 
-# Takim ve hakem gecmislerini, cekilen 90 gunluk tamamlanmis maclardan olustur.
+# 4) Takim ve hakem gecmislerini olustur.
 team_history = {}
 referee_history = {}
 output = []
@@ -361,7 +360,7 @@ for match in all_matches:
     if referee_key:
         referee_history.setdefault(referee_key, []).append(common)
 
-# Dosyalari ancak veri geldikten sonra yaz.
+# 5) JSON dosyalarini kaydet.
 with OUTPUT_FILE.open("w", encoding="utf-8") as file:
     json.dump(output, file, ensure_ascii=False, indent=2)
 
