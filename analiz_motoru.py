@@ -1,6 +1,7 @@
 
 import json
 import re
+import math
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -11,6 +12,8 @@ MIN_STREAK = 4
 PATTERN_LENGTH = 4
 SPECIAL_STREAK = 6
 MAX_SEQUENCE_DISPLAY = 10
+MAX_SCORE_PICKS = 6
+HISTORY_LIMIT = 12
 
 
 # ============================================================
@@ -37,10 +40,6 @@ def parity(value):
 
 
 def ordered(history):
-    """
-    Veri toplayici gecmisi en yeniden eskiye dogru kaydediyor.
-    Analiz icin en eskiden en yeniye ceviriyoruz.
-    """
     return list(reversed(history or []))
 
 
@@ -92,11 +91,6 @@ def sequence_text(values):
 # ============================================================
 
 def streak(values):
-    """
-    Son maclardan geriye dogru ayni tek/cift sonucunun
-    kac kez tekrarlandigini bulur.
-    """
-
     if not values:
         return None
 
@@ -104,10 +98,8 @@ def streak(values):
     length = 0
 
     for value in reversed(values):
-
         if value != last:
             break
-
         length += 1
 
     if length < MIN_STREAK:
@@ -123,22 +115,17 @@ def streak(values):
 
 
 def alternating(values):
-    """
-    Son dort kayitta TEK-CIFT-TEK-CIFT
-    veya CIFT-TEK-CIFT-TEK arar.
-    """
-
     if len(values) < PATTERN_LENGTH:
         return None
 
     last = values[-PATTERN_LENGTH:]
 
-    alternating_result = all(
+    valid = all(
         last[i] != last[i - 1]
         for i in range(1, PATTERN_LENGTH)
     )
 
-    if not alternating_result:
+    if not valid:
         return None
 
     return {
@@ -150,11 +137,6 @@ def alternating(values):
 
 
 def paired(values):
-    """
-    Son dort kayitta TEK-TEK-CIFT-CIFT
-    veya CIFT-CIFT-TEK-TEK arar.
-    """
-
     if len(values) < PATTERN_LENGTH:
         return None
 
@@ -182,7 +164,6 @@ def paired(values):
 # ============================================================
 
 def add_streak(signals, rule_id, label, values):
-
     result = streak(values)
 
     if not result:
@@ -199,14 +180,13 @@ def add_streak(signals, rule_id, label, values):
         "explanation": (
             f"Son {result['length']} maçta aralıksız "
             f"{result['last']} sonucu oluştu. "
-            f"Serinin devamı değil, kırılma senaryosu "
-            f"olarak {result['expected']} gösteriliyor."
+            f"Kırılma senaryosu olarak "
+            f"{result['expected']} gösteriliyor."
         )
     })
 
 
 def add_pattern(signals, rule_id, label, values, pair=False):
-
     result = paired(values) if pair else alternating(values)
 
     if not result:
@@ -222,26 +202,14 @@ def add_pattern(signals, rule_id, label, values, pair=False):
         "expected": result["expected"],
         "explanation": (
             f"Son dört kayıt: {sequence_text(result['sequence'])}. "
-            f"Belirlenen {result['pattern'].lower()} örüntüsü bulundu."
+            f"{result['pattern'].lower()} örüntüsü bulundu."
         )
     })
 
 
 def add_analysis(signals, rule_id, label, values):
-
-    add_streak(
-        signals,
-        rule_id,
-        label,
-        values
-    )
-
-    add_pattern(
-        signals,
-        rule_id,
-        label,
-        values
-    )
+    add_streak(signals, rule_id, label, values)
+    add_pattern(signals, rule_id, label, values)
 
 
 # ============================================================
@@ -249,15 +217,9 @@ def add_analysis(signals, rule_id, label, values):
 # ============================================================
 
 def special_run(history, kind):
-    """
-    En son oynanan mactan geriye dogru kontrol eder.
-    Skoru bulunmayan mac seriyi keser.
-    """
-
     run = 0
 
     for item in reversed(ordered(history)):
-
         result = score(item.get("finalScore"))
 
         if not result:
@@ -268,13 +230,10 @@ def special_run(history, kind):
 
         if kind == "KG YOK":
             matched = home == 0 or away == 0
-
         elif kind == "MS 0":
             matched = home == away
-
         elif kind == "2-3 GOL YOK":
             matched = total not in (2, 3)
-
         else:
             matched = False
 
@@ -287,31 +246,23 @@ def special_run(history, kind):
 
 
 def collect_special_series(home_history, away_history):
-
     special = []
 
     for side, history in (
         ("EV", home_history),
         ("DEP", away_history)
     ):
-
-        for kind in (
-            "KG YOK",
-            "MS 0",
-            "2-3 GOL YOK"
-        ):
-
+        for kind in ("KG YOK", "MS 0", "2-3 GOL YOK"):
             length = special_run(history, kind)
 
             if length >= SPECIAL_STREAK:
-
                 special.append({
                     "side": side,
                     "name": kind,
                     "length": length,
                     "explanation": (
-                        f"{side} takımının geçmişindeki son "
-                        f"{length} maçta {kind} koşulu gerçekleşti."
+                        f"{side} takımının son {length} maçında "
+                        f"{kind} koşulu gerçekleşti."
                     )
                 })
 
@@ -323,26 +274,18 @@ def collect_special_series(home_history, away_history):
 # ============================================================
 
 def is_finished(match):
-
     code = str(match.get("statusCode") or "").strip().lower()
     status = str(match.get("status") or "").strip().lower()
 
     finished_values = {
-        "final",
-        "finished",
-        "after_extra_time",
-        "after_penalties",
-        "ft",
-        "aet",
-        "pen",
-        "completed"
+        "final", "finished", "after_extra_time",
+        "after_penalties", "ft", "aet", "pen", "completed"
     }
 
     return code in finished_values or status in finished_values
 
 
 def parse_date(value):
-
     if not value:
         return None
 
@@ -350,13 +293,11 @@ def parse_date(value):
         return datetime.fromisoformat(
             str(value).replace("Z", "+00:00")
         )
-
     except (ValueError, TypeError):
         return None
 
 
 def is_upcoming(match, now):
-
     if is_finished(match):
         return False
 
@@ -376,11 +317,6 @@ def is_upcoming(match, now):
 # ============================================================
 
 def prediction_for_values(values):
-    """
-    Bir veri kaynağından tek bir beklenti üretir.
-    Öncelik 4+ maçlık seridedir; seri yoksa son dört kayıttaki
-    tanımlı örüntüler değerlendirilir.
-    """
     run = streak(values)
 
     if run:
@@ -423,10 +359,6 @@ def prediction_for_values(values):
 
 
 def build_expectations(home_history, away_history, ref_history):
-    """
-    Her pazar için üç ayrı veri kaynağını karşılaştırır.
-    Her kaynak en fazla bir oy verir. Uzun seriler daha ağır basar.
-    """
     markets = {
         "İY": [
             ("EV TAKIM GEÇMİŞİ", total_values(home_history, "halfTimeScore")),
@@ -500,70 +432,64 @@ def build_expectations(home_history, away_history, ref_history):
             "decision": decision,
             "votes": votes,
             "sources": source_details,
-            "supportCount": sum(1 for item in source_details if item["expected"] == decision)
-                if decision != "DEĞİŞKEN" else 0,
+            "supportCount": sum(
+                1 for item in source_details
+                if item["expected"] == decision
+            ) if decision != "DEĞİŞKEN" else 0,
             "conflict": votes["TEK"] > 0 and votes["ÇİFT"] > 0
         }
 
     return expectations, details
 
 
-def generate_score_scenarios(expectations, limit=12):
+# ============================================================
+# SKOR KOSULLARI
+# ============================================================
+
+def score_matches_expectations(ht_home, ht_away, ft_home, ft_away, expectations):
+    values = {
+        "İY": ht_home + ht_away,
+        "İY EV": ht_home,
+        "İY DEP": ht_away,
+        "MS": ft_home + ft_away,
+        "MS EV": ft_home,
+        "MS DEP": ft_away
+    }
+
+    for market, expected in expectations.items():
+        if expected in ("TEK", "ÇİFT"):
+            if parity(values[market]) != expected:
+                return False
+
+    return True
+
+
+def generate_main_score_scenarios(expectations, limit=60):
     """
-    Altı beklentiyle uyumlu İY ve MS skor çiftleri üretir.
-    DEĞİŞKEN alanlar filtreleme yapmaz. Bu skorlar olasılık değil,
-    yalnızca belirtilen tek/çift koşullarını sağlayan senaryolardır.
+    Ana sistemin altı pazar beklentisine uyan skor çiftlerini üretir.
+    Burada favori veya alternatif analiz puanı kullanılmaz.
     """
-    ht_total = expectations.get("İY", "DEĞİŞKEN")
-    ht_home = expectations.get("İY EV", "DEĞİŞKEN")
-    ht_away = expectations.get("İY DEP", "DEĞİŞKEN")
-    ft_total = expectations.get("MS", "DEĞİŞKEN")
-    ft_home = expectations.get("MS EV", "DEĞİŞKEN")
-    ft_away = expectations.get("MS DEP", "DEĞİŞKEN")
-
-    def matches(value, expected):
-        return expected == "DEĞİŞKEN" or parity(value) == expected
-
-    half_scores = []
-    for home_ht in range(5):
-        for away_ht in range(5):
-            if not matches(home_ht + away_ht, ht_total):
-                continue
-            if not matches(home_ht, ht_home):
-                continue
-            if not matches(away_ht, ht_away):
-                continue
-            half_scores.append((home_ht, away_ht))
-
-    full_scores = []
-    for home_ft in range(7):
-        for away_ft in range(7):
-            if not matches(home_ft + away_ft, ft_total):
-                continue
-            if not matches(home_ft, ft_home):
-                continue
-            if not matches(away_ft, ft_away):
-                continue
-            full_scores.append((home_ft, away_ft))
-
     scenarios = []
 
-    for home_ht, away_ht in half_scores:
-        for home_ft, away_ft in full_scores:
-            if home_ft < home_ht or away_ft < away_ht:
-                continue
+    for ht_home in range(5):
+        for ht_away in range(5):
+            for ft_home in range(ht_home, 7):
+                for ft_away in range(ht_away, 7):
+                    if not score_matches_expectations(
+                        ht_home, ht_away, ft_home, ft_away, expectations
+                    ):
+                        continue
 
-            scenarios.append({
-                "halfTimeScore": f"{home_ht}-{away_ht}",
-                "finalScore": f"{home_ft}-{away_ft}"
-            })
+                    scenarios.append({
+                        "halfTimeScore": f"{ht_home}-{ht_away}",
+                        "finalScore": f"{ft_home}-{ft_away}",
+                        "source": "ANA SİSTEM"
+                    })
 
-    # Daha düşük toplam gollü uyumlu senaryoları önce göster.
     scenarios.sort(
         key=lambda item: (
             sum(int(x) for x in item["finalScore"].split("-")),
-            sum(int(x) for x in item["halfTimeScore"].split("-")),
-            item["finalScore"]
+            sum(int(x) for x in item["halfTimeScore"].split("-"))
         )
     )
 
@@ -571,31 +497,321 @@ def generate_score_scenarios(expectations, limit=12):
 
 
 # ============================================================
+# TAKIM GOL VERISI VE ALTERNATIF ANALIZ
+# ============================================================
+
+def average(values):
+    clean = [float(value) for value in values if value is not None]
+
+    if not clean:
+        return None
+
+    return sum(clean) / len(clean)
+
+
+def team_goal_samples(history, side, field):
+    """
+    Geçmiş takım kayıtlarında takımın kendi attığı/yediği golü döndürür.
+    Ev/deplasman ayrımı kayıtların home/away alanından yapılır.
+    """
+    values = []
+
+    for item in ordered(history)[-HISTORY_LIMIT:]:
+        if side == "home" and item.get("home") is False:
+            continue
+        if side == "away" and item.get("away") is False:
+            continue
+
+        value = item.get(field)
+
+        if value is not None:
+            try:
+                values.append(float(value))
+            except (ValueError, TypeError):
+                continue
+
+    return values
+
+
+def team_profile(history, venue):
+    """
+    Takımın attığı ve yediği gol ortalamalarını hesaplar.
+    Önce istenen saha türünü, veri yoksa genel geçmişi kullanır.
+    """
+    scored_field = "teamGoalsFT"
+    conceded_field = "opponentGoalsFT"
+
+    scored = team_goal_samples(history, venue, scored_field)
+    conceded = team_goal_samples(history, venue, conceded_field)
+
+    if len(scored) < 3:
+        scored = team_goal_samples(history, "all", scored_field)
+
+    if len(conceded) < 3:
+        conceded = team_goal_samples(history, "all", conceded_field)
+
+    return {
+        "scored": average(scored),
+        "conceded": average(conceded),
+        "sampleScored": len(scored),
+        "sampleConceded": len(conceded)
+    }
+
+
+def expected_goals(home_history, away_history):
+    """
+    Ev sahibi gol beklentisi:
+    ev sahibinin gol üretimi ve deplasmanın gol yeme verisi.
+
+    Deplasman gol beklentisi:
+    deplasmanın gol üretimi ve ev sahibinin gol yeme verisi.
+    """
+    home = team_profile(home_history, "home")
+    away = team_profile(away_history, "away")
+
+    home_inputs = [
+        home["scored"],
+        away["conceded"]
+    ]
+    away_inputs = [
+        away["scored"],
+        home["conceded"]
+    ]
+
+    home_inputs = [value for value in home_inputs if value is not None]
+    away_inputs = [value for value in away_inputs if value is not None]
+
+    home_expected = average(home_inputs)
+    away_expected = average(away_inputs)
+
+    # Saha ayrımında yeterli veri yoksa genel takım ortalamasına
+    # düşülür; yine veri yoksa skor tahmini yapılmaz.
+    return home_expected, away_expected, home, away
+
+
+def poisson_probability(goals, expected):
+    if expected is None or expected < 0:
+        return 0.0
+
+    expected = max(0.05, min(expected, 5.0))
+
+    return (
+        math.exp(-expected)
+        * (expected ** goals)
+        / math.factorial(goals)
+    )
+
+
+def score_data_strength(ht_home, ht_away, ft_home, ft_away,
+                        expected_home, expected_away):
+    """
+    Skorun takım gol ortalamalarına göre göreli model desteği.
+    Gerçekleşme olasılığı değildir.
+    """
+    if expected_home is None or expected_away is None:
+        return 0.0
+
+    ft_probability = (
+        poisson_probability(ft_home, expected_home)
+        * poisson_probability(ft_away, expected_away)
+    )
+
+    # İlk yarı skorunun, maç sonu skorundan daha düşük kalması
+    # doğal olarak kontrol edilir; yarı gol beklentisi yaklaşık
+    # maç sonu gol beklentisinin %45'i kabul edilir.
+    ht_probability = (
+        poisson_probability(ht_home, expected_home * 0.45)
+        * poisson_probability(ht_away, expected_away * 0.45)
+    )
+
+    return ft_probability * ht_probability
+
+
+def generate_alternative_scores(
+    expectations,
+    home_history,
+    away_history,
+    excluded,
+    limit=60
+):
+    """
+    Ana sistem altı skor üretemediğinde kalan yerleri doldurur.
+    Ana sistemin net verdiği tek/çift kararları burada da zorunludur.
+    """
+    expected_home, expected_away, home_profile, away_profile = (
+        expected_goals(home_history, away_history)
+    )
+
+    if expected_home is None or expected_away is None:
+        return [], {
+            "available": False,
+            "reason": "Gol ortalamalarını hesaplamak için yeterli takım verisi yok.",
+            "homeExpectedGoals": expected_home,
+            "awayExpectedGoals": expected_away
+        }
+
+    candidates = []
+
+    for ht_home in range(5):
+        for ht_away in range(5):
+            for ft_home in range(ht_home, 7):
+                for ft_away in range(ht_away, 7):
+                    if not score_matches_expectations(
+                        ht_home, ht_away, ft_home, ft_away, expectations
+                    ):
+                        continue
+
+                    key = (
+                        f"{ht_home}-{ht_away}",
+                        f"{ft_home}-{ft_away}"
+                    )
+
+                    if key in excluded:
+                        continue
+
+                    strength = score_data_strength(
+                        ht_home,
+                        ht_away,
+                        ft_home,
+                        ft_away,
+                        expected_home,
+                        expected_away
+                    )
+
+                    if strength <= 0:
+                        continue
+
+                    candidates.append({
+                        "halfTimeScore": key[0],
+                        "finalScore": key[1],
+                        "source": "ALTERNATİF ANALİZ",
+                        "rawStrength": strength
+                    })
+
+    candidates.sort(
+        key=lambda item: item["rawStrength"],
+        reverse=True
+    )
+
+    return candidates[:limit], {
+        "available": True,
+        "reason": None,
+        "homeExpectedGoals": round(expected_home, 2),
+        "awayExpectedGoals": round(expected_away, 2),
+        "homeSamples": min(
+            home_profile["sampleScored"],
+            home_profile["sampleConceded"]
+        ),
+        "awaySamples": min(
+            away_profile["sampleScored"],
+            away_profile["sampleConceded"]
+        )
+    }
+
+
+# ============================================================
+# ALTI SKORU BIRLESTIR VE SIRALA
+# ============================================================
+
+def build_six_score_picks(
+    expectations,
+    home_history,
+    away_history
+):
+    """
+    Ana sistem skorları önceliklidir.
+    Altı skor tamamlanmazsa alternatif analiz kalan yerleri doldurur.
+    """
+    main_scores = generate_main_score_scenarios(
+        expectations,
+        limit=60
+    )
+
+    expected_home, expected_away, _, _ = expected_goals(
+        home_history,
+        away_history
+    )
+
+    # Ana sistem skorlarının kendi iç sıralaması da takım gol
+    # verileriyle yapılır. Ana sistemin ürettiği skorlar korunur.
+    if expected_home is not None and expected_away is not None:
+        for item in main_scores:
+            ht_home, ht_away = map(
+                int, item["halfTimeScore"].split("-")
+            )
+            ft_home, ft_away = map(
+                int, item["finalScore"].split("-")
+            )
+
+            item["rawStrength"] = score_data_strength(
+                ht_home, ht_away, ft_home, ft_away,
+                expected_home, expected_away
+            )
+
+        main_scores.sort(
+            key=lambda item: item.get("rawStrength", 0),
+            reverse=True
+        )
+
+    selected = main_scores[:MAX_SCORE_PICKS]
+    used = {
+        (item["halfTimeScore"], item["finalScore"])
+        for item in selected
+    }
+
+    alternative_meta = {
+        "available": False,
+        "reason": "Ana sistem altı skor üretti; alternatif analize ihtiyaç yok."
+    }
+
+    if len(selected) < MAX_SCORE_PICKS:
+        alternatives, alternative_meta = generate_alternative_scores(
+            expectations,
+            home_history,
+            away_history,
+            used,
+            limit=MAX_SCORE_PICKS - len(selected)
+        )
+
+        selected.extend(alternatives)
+
+    # Skorların göreli veri destek puanı.
+    raw_values = [
+        max(0.0, float(item.get("rawStrength", 0.0)))
+        for item in selected
+    ]
+    total_strength = sum(raw_values)
+
+    for index, item in enumerate(selected):
+        if total_strength > 0:
+            support = raw_values[index] / total_strength * 100
+        else:
+            support = 0.0
+
+        item["rank"] = index + 1
+        item["supportScore"] = round(support, 1)
+        item.pop("rawStrength", None)
+
+    return selected, alternative_meta
+
+
+# ============================================================
 # KURAL TARAMASI
 # ============================================================
 
 def analyze_match(match):
-
     home_history = match.get("homeMatches") or []
     away_history = match.get("awayMatches") or []
     ref_history = match.get("refMatches") or []
 
     signals = []
 
-    # --------------------------------------------------------
     # A1 - IY TOPLAM GOL ORUNTUSU
-    # --------------------------------------------------------
-
     for side, history in (
         ("EV", home_history),
         ("DEP", away_history)
     ):
-
-        values = total_values(
-            history,
-            "halfTimeScore"
-        )
-
+        values = total_values(history, "halfTimeScore")
         add_pattern(
             signals,
             f"A1_{side}",
@@ -603,20 +819,12 @@ def analyze_match(match):
             values
         )
 
-    # --------------------------------------------------------
     # A2 - TAKIMIN KENDI IY GOLU
-    # --------------------------------------------------------
-
     for side, history in (
         ("EV", home_history),
         ("DEP", away_history)
     ):
-
-        values = own_values(
-            history,
-            "teamGoalsHT"
-        )
-
+        values = own_values(history, "teamGoalsHT")
         add_analysis(
             signals,
             f"A2_{side}",
@@ -624,20 +832,12 @@ def analyze_match(match):
             values
         )
 
-    # --------------------------------------------------------
     # A3 - IY TOPLAM GOL SERISI
-    # --------------------------------------------------------
-
     for side, history in (
         ("EV", home_history),
         ("DEP", away_history)
     ):
-
-        values = total_values(
-            history,
-            "halfTimeScore"
-        )
-
+        values = total_values(history, "halfTimeScore")
         add_streak(
             signals,
             f"A3_{side}",
@@ -645,20 +845,12 @@ def analyze_match(match):
             values
         )
 
-    # --------------------------------------------------------
     # B1 - MS TOPLAM GOL ORUNTUSU
-    # --------------------------------------------------------
-
     for side, history in (
         ("EV", home_history),
         ("DEP", away_history)
     ):
-
-        values = total_values(
-            history,
-            "finalScore"
-        )
-
+        values = total_values(history, "finalScore")
         add_pattern(
             signals,
             f"B1_{side}",
@@ -666,20 +858,12 @@ def analyze_match(match):
             values
         )
 
-    # --------------------------------------------------------
     # B2 - TAKIMIN KENDI MS GOLU
-    # --------------------------------------------------------
-
     for side, history in (
         ("EV", home_history),
         ("DEP", away_history)
     ):
-
-        values = own_values(
-            history,
-            "teamGoalsFT"
-        )
-
+        values = own_values(history, "teamGoalsFT")
         add_analysis(
             signals,
             f"B2_{side}",
@@ -687,102 +871,47 @@ def analyze_match(match):
             values
         )
 
-    # --------------------------------------------------------
-    # C1 - HAKEM IY TOPLAM GOL
-    # --------------------------------------------------------
+    # C1 - HAKEM IY TOPLAM
+    ref_ht = total_values(ref_history, "halfTimeScore")
+    add_analysis(signals, "C1", "HAKEM İY TOPLAM", ref_ht)
 
-    ref_ht = total_values(
-        ref_history,
-        "halfTimeScore"
-    )
+    # C2 - HAKEM MS TOPLAM
+    ref_ft = total_values(ref_history, "finalScore")
+    add_analysis(signals, "C2", "HAKEM MS TOPLAM", ref_ft)
 
-    add_analysis(
-        signals,
-        "C1",
-        "HAKEM İY TOPLAM",
-        ref_ht
-    )
-
-    # --------------------------------------------------------
-    # C2 - HAKEM MS TOPLAM GOL
-    # --------------------------------------------------------
-
-    ref_ft = total_values(
-        ref_history,
-        "finalScore"
-    )
-
-    add_analysis(
-        signals,
-        "C2",
-        "HAKEM MS TOPLAM",
-        ref_ft
-    )
-
-    # --------------------------------------------------------
     # C3 - HAKEM EV SAHIBI IY GOL
-    # --------------------------------------------------------
-
     add_analysis(
         signals,
         "C3",
         "HAKEM EV SAHİBİ İY GOL",
-        side_values(
-            ref_history,
-            "halfTimeScore",
-            "home"
-        )
+        side_values(ref_history, "halfTimeScore", "home")
     )
 
-    # --------------------------------------------------------
     # C4 - HAKEM EV SAHIBI MS GOL
-    # --------------------------------------------------------
-
     add_analysis(
         signals,
         "C4",
         "HAKEM EV SAHİBİ MS GOL",
-        side_values(
-            ref_history,
-            "finalScore",
-            "home"
-        )
+        side_values(ref_history, "finalScore", "home")
     )
 
-    # --------------------------------------------------------
     # C5 - HAKEM DEPLASMAN IY GOL
-    # --------------------------------------------------------
-
     add_analysis(
         signals,
         "C5",
         "HAKEM DEPLASMAN İY GOL",
-        side_values(
-            ref_history,
-            "halfTimeScore",
-            "away"
-        )
+        side_values(ref_history, "halfTimeScore", "away")
     )
 
-    # --------------------------------------------------------
     # C6 - HAKEM DEPLASMAN MS GOL
-    # --------------------------------------------------------
-
     add_analysis(
         signals,
         "C6",
         "HAKEM DEPLASMAN MS GOL",
-        side_values(
-            ref_history,
-            "finalScore",
-            "away"
-        )
+        side_values(ref_history, "finalScore", "away")
     )
 
-    # --------------------------------------------------------
-    # C7 - HAKEM IY IKILI BLOK ORUNTUSU
-    # --------------------------------------------------------
-
+    # C7 - HAKEM IY IKILI BLOK
     add_pattern(
         signals,
         "C7",
@@ -791,17 +920,17 @@ def analyze_match(match):
         pair=True
     )
 
-    # --------------------------------------------------------
-    # BEKLENTILER VE OZEL SERILER
-    # --------------------------------------------------------
-
     expectations, expectation_details = build_expectations(
         home_history,
         away_history,
         ref_history
     )
 
-    score_scenarios = generate_score_scenarios(expectations)
+    score_picks, alternative_meta = build_six_score_picks(
+        expectations,
+        home_history,
+        away_history
+    )
 
     special = collect_special_series(
         home_history,
@@ -812,7 +941,8 @@ def analyze_match(match):
         "signals": signals,
         "expectations": expectations,
         "expectationDetails": expectation_details,
-        "scoreScenarios": score_scenarios,
+        "scoreScenarios": score_picks,
+        "alternativeAnalysis": alternative_meta,
         "specialSeries": special,
         "dataQuality": {
             "homeHistory": len(home_history),
@@ -827,16 +957,12 @@ def analyze_match(match):
 # ============================================================
 
 def main():
-
     if not SOURCE.exists():
-        raise SystemExit(
-            "HATA: bulten.json bulunamadi."
-        )
+        raise SystemExit("HATA: bulten.json bulunamadi.")
 
     try:
         with SOURCE.open("r", encoding="utf-8") as file:
             matches = json.load(file)
-
     except json.JSONDecodeError as error:
         raise SystemExit(
             f"HATA: bulten.json JSON formati gecersiz: {error}"
@@ -854,7 +980,6 @@ def main():
     finished_count = 0
 
     for match in matches:
-
         if not isinstance(match, dict):
             continue
 
@@ -866,18 +991,19 @@ def main():
             continue
 
         upcoming_count += 1
-
         analysis = analyze_match(match)
 
         signals = analysis["signals"]
         special = analysis["specialSeries"]
 
-        # Beklenti, sinyal veya özel seri bulunan maçları listeye al.
         has_expectation = any(
             value != "DEĞİŞKEN"
             for value in analysis["expectations"].values()
         )
-        if not signals and not special and not has_expectation:
+
+        has_scores = bool(analysis["scoreScenarios"])
+
+        if not signals and not special and not has_expectation and not has_scores:
             continue
 
         results.append({
@@ -893,13 +1019,13 @@ def main():
             "expectations": analysis["expectations"],
             "expectationDetails": analysis["expectationDetails"],
             "scoreScenarios": analysis["scoreScenarios"],
+            "alternativeAnalysis": analysis["alternativeAnalysis"],
             "signals": signals,
             "specialSeries": special,
             "signalCount": len(signals) + len(special),
             "dataQuality": analysis["dataQuality"]
         })
 
-    # Once daha fazla sinyal, sonra daha yakin mac.
     results.sort(
         key=lambda item: (
             item["signalCount"],
@@ -911,22 +1037,22 @@ def main():
     output = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "source": "SportStatsAPI",
-
         "method": {
             "minimumStreak": MIN_STREAK,
             "patternLength": PATTERN_LENGTH,
             "minimumSpecialStreak": SPECIAL_STREAK,
             "ruleCount": 12,
+            "scorePickCount": MAX_SCORE_PICKS,
             "note": (
-                "Seri kirilma beklentisi kesin tahmin degildir. "
-                "Oruntu, gecmis kayitlarda gozlenen siralamadir. "
-                "Kaynaklar ayrı değerlendirilir; uzun seriler daha ağır ağırlık alır. "
-                "Olası skorlar yalnızca beklentilerle uyumlu senaryolardır. "
-                "Yeterli veri yoksa beklenti DEĞİŞKEN kalir. "
-                "Bu cikti garanti veya bahis tavsiyesi degildir."
+                "Ana sistemin TEK/CIFT beklentileri önceliklidir. "
+                "Altı skor tamamlanmazsa alternatif gol verisi analizi "
+                "eksik skorları doldurur. Alternatif skorlar ana sistemin "
+                "net pazar kararlarıyla çelişemez. Destek puanı gerçek "
+                "olasılık değildir; seçilen skorlar arasındaki göreli "
+                "model desteğini gösterir. Yeterli veri yoksa alternatif "
+                "tahmin üretilmez. Bu çıktı garanti veya bahis tavsiyesi değildir."
             )
         },
-
         "summary": {
             "sourceMatches": len(matches),
             "finishedMatches": finished_count,
@@ -936,7 +1062,6 @@ def main():
                 item["signalCount"] for item in results
             )
         },
-
         "matches": results
     }
 
