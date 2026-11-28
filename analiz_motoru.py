@@ -359,9 +359,7 @@ def prediction_for_values(values):
         }
 
     return None
-
-
-def venue_own_values(history, team_name, venue, field):
+    def venue_own_values(history, team_name, venue, field):
     """
     Takımın yalnızca kendi belirlenen saha koşulundaki attığı/yediği gol.
     home/away alanları karşılaşmadaki takım adlarıdır.
@@ -369,8 +367,7 @@ def venue_own_values(history, team_name, venue, field):
     values = []
 
     for item in ordered(history):
-        if venue == "home" and item.get("home")
-         != team_name:
+        if venue == "home" and item.get("home") != team_name:
             continue
         if venue == "away" and item.get("away") != team_name:
             continue
@@ -403,7 +400,6 @@ def source_observation(source_name, values, group):
     odd_count = recent.count("TEK")
     even_count = recent.count("ÇİFT")
 
-    # Seri ve örüntü tüm mevcut geçmiş üzerinden hesaplanır.
     prediction = prediction_for_values(values)
 
     if prediction:
@@ -593,7 +589,7 @@ def build_expectations(
 def score_matches_expectations(ht_home, ht_away, ft_home, ft_away, expectations):
     values = {
         "İY": ht_home + ht_away,
-                "İY EV": ht_home,
+        "İY EV": ht_home,
         "İY DEP": ht_away,
         "MS": ft_home + ft_away,
         "MS EV": ft_home,
@@ -609,8 +605,6 @@ def score_matches_expectations(ht_home, ht_away, ft_home, ft_away, expectations)
 
 
 def generate_main_score_scenarios(expectations, limit=60):
-    # Altı piyasanın tamamı değişkense ana sistemin kesin bir kararı yoktur.
-    # Bu durumda ana sistem skor üretmez; alternatif analize alan açılır.
     if not any(value in ("TEK", "ÇİFT") for value in expectations.values()):
         return []
 
@@ -660,7 +654,6 @@ def team_goal_samples(history, team_name, venue, field):
     """
     values = []
 
-    # Gol ortalaması yakın dönem formu için son 12 maçla sınırlıdır.
     for item in ordered(history)[-RECENT_FORM_LIMIT:]:
         if venue == "home" and item.get("home") != team_name:
             continue
@@ -844,9 +837,7 @@ def generate_alternative_scores(
             away_profile["sampleConceded"]
         )
     }
-
-
-# ============================================================
+    # ============================================================
 # ALTI SKORU BIRLESTIR VE SIRALA
 # ============================================================
 
@@ -885,7 +876,7 @@ def build_six_score_picks(
 
         main_scores.sort(
             key=lambda item: item.get("rawStrength", 0),
-                        reverse=True
+            reverse=True
         )
 
     selected = main_scores[:MAX_SCORE_PICKS]
@@ -1105,9 +1096,7 @@ def analyze_match(match):
         },
         "goalDataQuality": goal_data_quality
     }
-
-
-# ============================================================
+    # ============================================================
 # GUNLUK SISTEM TAHMINLERI
 # ============================================================
 
